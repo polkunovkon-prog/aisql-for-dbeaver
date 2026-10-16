@@ -101,9 +101,13 @@ wait_for_marker() {
 
 stop_dbeaver() {
     kill "$DBEAVER_PID" 2>/dev/null || true
-    sleep 2
+    sleep 3
     kill -9 "$DBEAVER_PID" 2>/dev/null || true
     wait "$DBEAVER_PID" 2>/dev/null || true
+    # Страховка от осиротевших процессов этого запуска (Java/Xvfb).
+    # Шаблон — путь рабочей среды, он не совпадает с командной строкой самого скрипта.
+    pkill -f "$DATA_DIR" 2>/dev/null || true
+    sleep 1
 }
 
 # Первый запуск — регистрация.
