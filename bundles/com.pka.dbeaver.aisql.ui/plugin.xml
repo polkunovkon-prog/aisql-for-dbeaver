@@ -115,4 +115,8 @@
             icon="icons/aisql_settings.png"/>
    </extension>
 
+   <extension point="org.eclipse.ui.startup">
+      <startup class="com.pka.dbeaver.aisql.ui.AisqlBootMarker"/>
+   </extension>
+
 </plugin>
