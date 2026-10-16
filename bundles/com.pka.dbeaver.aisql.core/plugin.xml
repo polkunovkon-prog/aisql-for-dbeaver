@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<!--
+  Регистрация AI-функций плагина в штатной точке расширения DBeaver
+  com.dbeaver.ai.function. Все функции попадают во внутренний тулбокс "db",
+  полные идентификаторы — db_<id> (db_runQuery, db_executeSql, ...).
+
+  Никакие вендорные бандлы не патчатся.
+-->
+<plugin>
+
+   <extension point="com.dbeaver.ai.function">
+
+      <category
+            id="ai.sql"
+            name="Выполнение SQL через ИИ"
+            description="Функции выполнения SQL-запросов и работы с объектами базы данных."/>
+
+      <function
+            id="runQuery"
+            name="Выполнить SQL-запрос"
+            enabledByDefault="true"
+            type="INFORMATION"
+            purpose="ALL"
+            system="true"
+            defaultAllowMode="ASK"
+            class="com.pka.dbeaver.aisql.core.functions.RunQueryFunction"
+            categoryId="ai.sql"
+            description="Выполняет READ-ONLY SQL-запрос (SELECT, WITH, SHOW, DESCRIBE, EXPLAIN, VALUES, TABLE) на текущем активном подключении к базе данных и возвращает полученные строки. ИСПОЛЬЗУЙ ЭТУ ФУНКЦИЮ, когда пользователь просит реальные данные, количество, агрегаты, примеры строк или любое содержимое, фактически хранящееся в БД. Запрос проверяется синтаксическим анализатором DBeaver и выполняется только с правами самого пользователя. Передавай один полный SQL-оператор (без нескольких операторов, разделённых точкой с запятой) в параметре sql. Предпочитай агрегаты (COUNT, GROUP BY, LIMIT), чтобы результат был небольшим. Сначала используй db_listTableNames / db_getTableDetails, чтобы узнать точные имена таблиц и столбцов. Для изменения данных или выполнения DDL используй db_executeSql.">
+         <parameter name="sql" required="true" type="string" description="Один read-only SQL-оператор для выполнения (SELECT/WITH/SHOW/DESCRIBE/EXPLAIN/VALUES/TABLE). Несколько операторов, разделённых точкой с запятой, указывать нельзя."/>
+         <parameter name="maxRows" required="false" type="integer" description="Максимальное число возвращаемых строк. По умолчанию: 200. Максимум: 5000."/>
+      </function>
+
+      <function
+            id="executeSql"
+            name="Выполнить любой SQL (изменение данных, DDL, DCL)"
+            enabledByDefault="true"
+            type="ACTION"
+            purpose="ALL"
+            system="true"
+            defaultAllowMode="ASK"
+            class="com.pka.dbeaver.aisql.core.functions.ExecuteSqlFunction"
+            categoryId="ai.sql"
+            description="Выполняет ЛЮБОЙ SQL на текущем активном подключении от имени пользователя: INSERT, UPDATE, DELETE, MERGE, TRUNCATE, DDL (CREATE/ALTER/DROP для таблиц, представлений, функций, процедур, триггеров, индексов), DCL (GRANT/REVOKE), вызовы процедур, а также скрипты из нескольких операторов, разделённых точкой с запятой. Права определяются учётной записью СУБД, под которой подключён DBeaver; функция не обходит права. На подключениях с профилем READ_ONLY изменяющие операторы запрещены настройками плагина. ИСПОЛЬЗУЙ ЭТУ ФУНКЦИЮ для любых изменений схемы или данных, для создания и изменения функций/процедур/представлений. Перед изменением данных, когда это важно, сначала прочитай структуру через db_listObjects / db_getObjectDdl. Если включена настройка, автокоммит автоматически отключается при изменяющих операторах, чтобы пользователь мог зафиксировать или откатить изменения. Обязательно заполняй reason — краткое объяснение цели изменения на русском языке, оно показывается пользователю в запросе подтверждения.">
+         <parameter name="sql" required="true" type="string" description="SQL для выполнения: один оператор или скрипт из нескольких операторов, разделённых точкой с запятой."/>
+         <parameter name="reason" required="false" type="string" description="Краткое объяснение на русском, зачем выполняется этот SQL. Показывается пользователю в подтверждении."/>
+         <parameter name="maxRows" required="false" type="integer" description="Максимум строк для операторов, возвращающих результат. По умолчанию: 200."/>
+         <parameter name="timeout" required="false" type="integer" description="Таймаут выполнения в секундах. По умолчанию: 60."/>
+      </function>
+
+      <function
+            id="getContext"
+            name="Сведения о текущем подключении"
+            enabledByDefault="true"
+            type="INFORMATION"
+            purpose="ALL"
+            system="true"
+            defaultAllowMode="ALWAYS_ALLOW"
+            class="com.pka.dbeaver.aisql.core.functions.GetContextFunction"
+            categoryId="ai.sql"
+            description="Возвращает сведения о текущем подключении: СУБД и её версия, драйвер, учётная запись, URL, база данных и схема по умолчанию, поддержка транзакций, режим только чтение, состояние автокоммита, а также действующий профиль безопасности плагина (READ_ONLY / STANDARD / FULL). Используй перед работой с новой базой, чтобы понять особенности СУБД и ограничения.">
+      </function>
+
+      <function
+            id="listObjects"
+            name="Список объектов базы данных"
+            enabledByDefault="true"
+            type="INFORMATION"
+            purpose="ALL"
+            system="true"
+            defaultAllowMode="ALWAYS_ALLOW"
+            class="com.pka.dbeaver.aisql.core.functions.ListObjectsFunction"
+            categoryId="ai.sql"
+            description="Возвращает список объектов базы данных: таблицы, представления, схемы, последовательности, функции, процедуры, триггеры, индексы и другие. Можно фильтровать по типу (type), по имени (nameFilter — подстрока или регулярное выражение, начинающееся с косой черты) и по схеме (schema). Используй, чтобы узнать, какие функции/процедуры уже есть и какие таблицы доступны.">
+         <parameter name="type" required="false" type="string" description="Фильтр по типу объекта, например TABLE, VIEW, FUNCTION, PROCEDURE, SCHEMA, SEQUENCE, TRIGGER, INDEX. Пусто — все типы."/>
+         <parameter name="nameFilter" required="false" type="string" description="Фильтр по имени: подстрока (без учёта регистра) или регулярное выражение, если значение начинается с косой черты."/>
+         <parameter name="schema" required="false" type="string" description="Имя схемы/каталога, внутри которого искать. Пусто — вся база."/>
+         <parameter name="includeSystem" required="false" type="boolean" description="Включать системные и служебные объекты. По умолчанию: false."/>
+      </function>
+
+      <function
+            id="getObjectDdl"
+            name="SQL-определение объекта (DDL)"
+            enabledByDefault="true"
+            type="INFORMATION"
+            purpose="ALL"
+            system="true"
+            defaultAllowMode="ALWAYS_ALLOW"
+            class="com.pka.dbeaver.aisql.core.functions.GetObjectDdlFunction"
+            categoryId="ai.sql"
+            description="Возвращает SQL-определение (DDL) объекта базы данных: таблицы, представления, функции, процедуры, триггера, ограничения. Используй, чтобы ИЗУЧИТЬ существующую функцию или процедуру по её исходному коду, прежде чем предлагать изменения, либо чтобы получить структуру таблицы. Имя указывай полностью (схема.объект) либо кратко.">
+         <parameter name="objectName" required="true" type="string" description="Полное или краткое имя объекта. Пример: public.my_function или my_table."/>
+         <parameter name="schema" required="false" type="string" description="Имя схемы, если нужно уточнить."/>
+      </function>
+
+      <function
+            id="explain"
+            name="План выполнения запроса"
+            enabledByDefault="true"
+            type="INFORMATION"
+            purpose="ALL"
+            system="true"
+            defaultAllowMode="ALWAYS_ALLOW"
+            class="com.pka.dbeaver.aisql.core.functions.ExplainFunction"
+            categoryId="ai.sql"
+            description="Возвращает план выполнения SQL-запроса (EXPLAIN) для СУБД, которые это поддерживают. Используй для анализа производительности запросов. Функция только читает план выполнения и не изменяет данные.">
+         <parameter name="sql" required="true" type="string" description="SQL-запрос, для которого нужен план выполнения."/>
+      </function>
+
+      <function
+            id="help"
+            name="Справка по инструментам"
+            enabledByDefault="true"
+            type="INFORMATION"
+            purpose="ALL"
+            system="true"
+            defaultAllowMode="ALWAYS_ALLOW"
+            class="com.pka.dbeaver.aisql.core.functions.HelpFunction"
+            categoryId="ai.sql"
+            description="Возвращает краткую справку о доступных инструментах выполнения SQL, правилах безопасности и текущих ограничениях плагина. Используй, если не уверен, какой инструмент вызвать.">
+      </function>
+
+      <function
+            id="listMacros"
+            name="Список макросов"
+            enabledByDefault="true"
+            type="INFORMATION"
+            purpose="ALL"
+            system="true"
+            defaultAllowMode="ALWAYS_ALLOW"
+            class="com.pka.dbeaver.aisql.core.functions.ListMacrosFunction"
+            categoryId="ai.sql"
+            description="Возвращает список сохранённых макросов — именованных SQL-скриптов, которые можно многократно выполнять. Макросы создаются через db_defineMacro.">
+      </function>
+
+      <function
+            id="runMacro"
+            name="Выполнить макрос"
+            enabledByDefault="true"
+            type="INFORMATION"
+            purpose="ALL"
+            system="true"
+            defaultAllowMode="ASK"
+            class="com.pka.dbeaver.aisql.core.functions.RunMacroFunction"
+            categoryId="ai.sql"
+            description="Выполняет сохранённый макрос (именованный SQL-скрипт) с подстановкой параметров. Поддерживаются подстановки ${имя} и позиционные ${1}, ${2}. Значения передаются в параметре values в виде «имя=значение; имя2=значение2». Используй, чтобы повторно выполнять часто нужные операции. Действуют те же правила безопасности, что и у db_executeSql (профили READ_ONLY/STANDARD/FULL).">
+         <parameter name="name" required="true" type="string" description="Идентификатор макроса (см. db_listMacros)."/>
+         <parameter name="values" required="false" type="string" description="Значения параметров в виде «имя=значение; имя2=значение2». Позиционные параметры передаются без имени, по порядку."/>
+      </function>
+
+      <function
+            id="defineMacro"
+            name="Создать/обновить макрос"
+            enabledByDefault="true"
+            type="INFORMATION"
+            purpose="ALL"
+            system="true"
+            defaultAllowMode="ASK"
+            class="com.pka.dbeaver.aisql.core.functions.DefineMacroFunction"
+            categoryId="ai.sql"
+            description="Создаёт или обновляет макрос — сохранённый именованный SQL-скрипт, который затем можно выполнять через db_runMacro. Это способ обучить ИИ новому повторяемому инструменту. Используй, когда пользователь просит «запомнить» часто выполняемый запрос. При перезаписи существующего макроса предыдущая версия сохраняется в историю.">
+         <parameter name="name" required="true" type="string" description="Идентификатор макроса: латиница, цифры, знаки _ . - (до 64 символов)."/>
+         <parameter name="sql" required="true" type="string" description="SQL-скрипт макроса. Может содержать подстановки ${имя} и ${1}."/>
+         <parameter name="title" required="false" type="string" description="Заголовок макроса на русском."/>
+         <parameter name="description" required="false" type="string" description="Пояснение, что делает макрос."/>
+      </function>
+
+      <function
+            id="deleteMacro"
+            name="Удалить макрос"
+            enabledByDefault="true"
+            type="INFORMATION"
+            purpose="ALL"
+            system="true"
+            defaultAllowMode="ASK"
+            class="com.pka.dbeaver.aisql.core.functions.DeleteMacroFunction"
+            categoryId="ai.sql"
+            description="Удаляет сохранённый макрос по его идентификатору.">
+         <parameter name="name" required="true" type="string" description="Идентификатор макроса."/>
+      </function>
+
+   </extension>
+
+</plugin>

@@ -1,0 +1,17 @@
+# Артефакты сборки
+build/
+dist/
+
+# Временные файлы
+*.class
+*.jar
+*.log
+*~
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/

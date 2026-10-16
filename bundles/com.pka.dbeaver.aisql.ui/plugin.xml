@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<!--
+  AI SQL for DBeaver — UI-бандл:
+    - страница настроек (категория AI) + динамический alias
+      com.dbeaver.preferences.ai.tools (создаётся в PreferenceAliasRegistrar,
+      если id свободен);
+    - команды «спросить ИИ о выделенном» (SQL-редактор) и «спросить ИИ
+      о данных» (таблица результатов) с горячими клавишами;
+    - кнопка настроек в панели ИИ-чата.
+-->
+<plugin>
+
+   <extension point="org.eclipse.ui.preferencePages">
+      <page
+            id="com.pka.dbeaver.aisql.ui.preferences"
+            category="org.jkiss.dbeaver.preferences.ai"
+            class="com.pka.dbeaver.aisql.ui.AisqlPreferencePage"
+            name="%prefPage.name"/>
+   </extension>
+
+   <extension point="org.eclipse.ui.commands">
+      <category id="com.pka.dbeaver.aisql.commands.category" name="%commandCategory.name"/>
+      <command
+            id="com.pka.dbeaver.aisql.commands.askSelection"
+            categoryId="com.pka.dbeaver.aisql.commands.category"
+            name="%command.askSelection.name"/>
+      <command
+            id="com.pka.dbeaver.aisql.commands.askCell"
+            categoryId="com.pka.dbeaver.aisql.commands.category"
+            name="%command.askCell.name"/>
+      <command
+            id="com.pka.dbeaver.aisql.commands.openSettings"
+            categoryId="com.pka.dbeaver.aisql.commands.category"
+            name="%command.openSettings.name"/>
+   </extension>
+
+   <extension point="org.eclipse.ui.handlers">
+      <handler
+            class="com.pka.dbeaver.aisql.ui.handlers.AskAboutSelectionHandler"
+            commandId="com.pka.dbeaver.aisql.commands.askSelection"/>
+      <handler
+            class="com.pka.dbeaver.aisql.ui.handlers.AskAboutCellHandler"
+            commandId="com.pka.dbeaver.aisql.commands.askCell"/>
+      <handler
+            class="com.pka.dbeaver.aisql.ui.handlers.OpenSettingsHandler"
+            commandId="com.pka.dbeaver.aisql.commands.openSettings"/>
+   </extension>
+
+   <extension point="org.eclipse.ui.menus">
+      <!-- Контекстное меню SQL-редактора: «Спросить ИИ о выделенном». -->
+      <menuContribution allPopups="false"
+            locationURI="popup:org.jkiss.dbeaver.ui.editors.sql.SQLEditor.EditorContext?after=sql.extras">
+         <command
+               commandId="com.pka.dbeaver.aisql.commands.askSelection"
+               icon="icons/aisql_ask.png"
+               label="%menu.askSelection.label"
+               tooltip="%menu.askSelection.tooltip">
+            <visibleWhen checkEnabled="false">
+               <with variable="activeEditor">
+                  <test property="org.jkiss.dbeaver.ui.editors.sql.hasSelection" value="true"/>
+               </with>
+            </visibleWhen>
+         </command>
+      </menuContribution>
+
+      <!-- Кнопка настроек на панели ИИ-чата. -->
+      <menuContribution allPopups="false"
+            locationURI="toolbar:com.dbeaver.ai.chat">
+         <command
+               commandId="com.pka.dbeaver.aisql.commands.openSettings"
+               icon="icons/aisql_settings.png"
+               tooltip="%menu.openSettings.tooltip"/>
+      </menuContribution>
+
+      <!-- Кнопка «Спросить ИИ о данных» в панели кнопок таблицы результатов. -->
+      <menuContribution allPopups="false"
+            locationURI="toolbar:org.jkiss.dbeaver.ui.controls.resultset.status.editCmds">
+         <command
+               commandId="com.pka.dbeaver.aisql.commands.askCell"
+               icon="icons/aisql_ask.png"
+               tooltip="%menu.askCell.tooltip"/>
+      </menuContribution>
+   </extension>
+
+   <extension point="org.eclipse.ui.bindings">
+      <key
+            commandId="com.pka.dbeaver.aisql.commands.askSelection"
+            contextId="org.jkiss.dbeaver.ui.editors.sql"
+            schemeId="org.eclipse.ui.defaultAcceleratorConfiguration"
+            sequence="M1+M3+A"/>
+      <key
+            commandId="com.pka.dbeaver.aisql.commands.askCell"
+            contextId="org.jkiss.dbeaver.ui.context.resultset"
+            schemeId="org.eclipse.ui.defaultAcceleratorConfiguration"
+            sequence="M1+M3+I"/>
+   </extension>
+
+   <extension point="org.eclipse.ui.commandImages">
+      <image
+            commandId="com.pka.dbeaver.aisql.commands.askSelection"
+            icon="icons/aisql_ask.png"/>
+      <image
+            commandId="com.pka.dbeaver.aisql.commands.askCell"
+            icon="icons/aisql_ask.png"/>
+      <image
+            commandId="com.pka.dbeaver.aisql.commands.openSettings"
+            icon="icons/aisql_settings.png"/>
+   </extension>
+
+   <extension point="org.eclipse.ui.startup">
+      <startup class="com.pka.dbeaver.aisql.ui.PreferenceAliasRegistrar"/>
+   </extension>
+
+</plugin>
