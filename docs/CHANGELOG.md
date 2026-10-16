@@ -47,8 +47,9 @@
   DBeaver; `dist/`, `SHA256SUMS`, `BUILD-INFO.txt`);
 - офлайн-тесты `releng/test.sh` (105 проверок, plain Java);
 - установка/удаление `releng/install.sh` / `releng/uninstall.sh`
-  (dropins + регистрация p2-реконцилером под xvfb, запасной вариант —
-  правка `bundles.info`; миграция со старого патченного плагина);
+  (dropins + идемпотентная запись в `bundles.info` с резервной копией;
+  контрольный headless-запуск от имени рабочего пользователя; миграция
+  со старого патченного плагина);
 - документация `docs/` (INSTALL, USAGE, SECURITY, TESTING, ADR).
 
 **Известные ограничения**
