@@ -116,12 +116,16 @@ for rel in org.eclipse.osgi org.eclipse.core.runtime; do
         echo "   кэш OSGi сброшен ($DBEAVER_HOME/configuration/$rel)"
     fi
 done
-# У пользовательских запусков свой (записываемый) каталог конфигурации: туда
-# launcher уводит конфигурацию, когда системная недоступна на запись
-# (на этой машине — ~/eclipse/configuration). Кэши пользователя живут там же.
+# У пользовательских запусков своя configuration: при недоступной системной
+# DBeaver уводит её в персональный install-data
+# (~/.local/share/DBeaverData/install-data/<product>/<version>/) — там же лежат
+# кэши пользователя (манифесты бандлов и модель реестра). Дополнительно чистим
+# следы старых Eclipse в домашнем каталоге; все области самовосстанавливаемые.
 if [ "$CALLER" != "root" ] && [ -n "$CALLER_HOME" ]; then
     shopt -s nullglob
-    for cfgdir in "$CALLER_HOME/eclipse/configuration" "$CALLER_HOME"/.eclipse/*/configuration; do
+    for cfgdir in "$CALLER_HOME"/.local/share/DBeaverData/install-data/*/* \
+                  "$CALLER_HOME/eclipse/configuration" \
+                  "$CALLER_HOME"/.eclipse/*/configuration; do
         [ -d "$cfgdir" ] || continue
         for rel in org.eclipse.osgi org.eclipse.core.runtime; do
             if [ -d "$cfgdir/$rel" ]; then

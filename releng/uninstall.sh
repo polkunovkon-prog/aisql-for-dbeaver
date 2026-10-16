@@ -58,7 +58,8 @@ if [ "$UCALLER" != "root" ]; then
 fi
 if [ -n "${UHOME:-}" ] && [ -d "$UHOME" ]; then
     shopt -s nullglob
-    for cfgdir in "$UHOME/eclipse/configuration" "$UHOME"/.eclipse/*/configuration; do
+    for cfgdir in "$UHOME"/.local/share/DBeaverData/install-data/*/* \
+                  "$UHOME/eclipse/configuration" "$UHOME"/.eclipse/*/configuration; do
         [ -d "$cfgdir" ] || continue
         for rel in org.eclipse.osgi org.eclipse.core.runtime; do
             if [ -d "$cfgdir/$rel" ]; then
