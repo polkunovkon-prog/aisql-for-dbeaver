@@ -7,9 +7,10 @@ Bundle-Vendor: AI SQL Plugin
 Bundle-Activator: com.pka.dbeaver.aisql.core.AisqlCorePlugin
 Bundle-ActivationPolicy: lazy
 Bundle-RequiredExecutionEnvironment: JavaSE-21
-Bundle-Localization: OSGI-INF/l10n/bundle
+Export-Package: com.pka.dbeaver.aisql.core
 Require-Bundle: org.eclipse.core.runtime,
  org.eclipse.osgi,
  org.jkiss.dbeaver.model,
  org.jkiss.dbeaver.model.ai,
- org.jkiss.dbeaver.model.sql
+ org.jkiss.dbeaver.model.sql,
+ org.jkiss.utils
