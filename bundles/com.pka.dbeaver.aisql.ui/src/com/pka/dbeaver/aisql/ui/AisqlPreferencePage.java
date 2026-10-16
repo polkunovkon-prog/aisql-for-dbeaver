@@ -52,7 +52,7 @@ import java.util.Properties;
  */
 public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPreferencePage {
 
-    public static final String PAGE_ID = "com.pka.dbeaver.aisql.ui.preferences";
+    public static final String PAGE_ID = "com.dbeaver.preferences.ai.tools";
 
     private static final String[] PROFILES = { "READ_ONLY", "STANDARD", "FULL" };
 

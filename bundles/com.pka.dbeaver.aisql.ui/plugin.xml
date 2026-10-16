@@ -2,9 +2,8 @@
 <?eclipse version="3.4"?>
 <!--
   AI SQL for DBeaver — UI-бандл:
-    - страница настроек (категория AI) + динамический alias
-      com.dbeaver.preferences.ai.tools (создаётся в PreferenceAliasRegistrar,
-      если id свободен);
+    - страница настроек (категория AI); id страницы — com.dbeaver.preferences.ai.tools
+      (именно его открывает меню «Настроить инструменты» в карточке ИИ);
     - команды «спросить ИИ о выделенном» (SQL-редактор) и «спросить ИИ
       о данных» (таблица результатов) с горячими клавишами;
     - кнопка настроек в панели ИИ-чата.
@@ -12,8 +11,16 @@
 <plugin>
 
    <extension point="org.eclipse.ui.preferencePages">
+      <!--
+        Id страницы совпадает с тем, который DBeaver открывает из меню
+        «Настроить инструменты» карточки вызова функции ИИ
+        (org.jkiss.dbeaver.ui.ai.chat.controls.AIFunctionAllowMenu):
+        com.dbeaver.preferences.ai.tools. Вендор эту страницу в своей сборке
+        не регистрирует, поэтому регистрируем её мы — под этим id открывается
+        наша страница настроек. Кроме того, страница видна в Preferences → AI.
+      -->
       <page
-            id="com.pka.dbeaver.aisql.ui.preferences"
+            id="com.dbeaver.preferences.ai.tools"
             category="org.jkiss.dbeaver.preferences.ai"
             class="com.pka.dbeaver.aisql.ui.AisqlPreferencePage"
             name="%prefPage.name"/>
@@ -106,10 +113,6 @@
       <image
             commandId="com.pka.dbeaver.aisql.commands.openSettings"
             icon="icons/aisql_settings.png"/>
-   </extension>
-
-   <extension point="org.eclipse.ui.startup">
-      <startup class="com.pka.dbeaver.aisql.ui.PreferenceAliasRegistrar"/>
    </extension>
 
 </plugin>

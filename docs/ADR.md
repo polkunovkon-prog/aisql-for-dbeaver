@@ -137,3 +137,39 @@ AI-функции — реальные значения остаются лок�
 
 **Отклонено.** `preferences.ini`/`InstanceScope` — неудобно переносить между
 машинами и проверять инструментами.
+
+---
+
+## ADR-9. Singleton и статическая страница настроек (итоги приёмочного теста)
+
+**Контекст.** При первом интерфейсном тесте ИИ-чат сообщил об отсутствии
+инструментов выполнения SQL, хотя бандлы грузились. Диагностика по `.log`:
+Equinox игнорировал расширения ядра без `singleton:=true` («The extensions
+and extension-points from the bundle "com.pka.dbeaver.aisql.core" are
+ignored. The bundle is not marked as singleton»), а динамическая
+регистрация alias-страницы падала («Unauthorized access to the
+ExtensionRegistry.addContribution() method» — Equinox требует служебный
+токен доступа, недоступный сторонним бандлам).
+
+**Решение.**
+
+- `Bundle-SymbolicName: com.pka.dbeaver.aisql.core;singleton:=true` —
+  штатное требование Eclipse к бандлам, дающим точки расширения;
+- страница настроек регистрируется **статически** под id
+  `com.dbeaver.preferences.ai.tools` — именно его открывает пункт
+  «Configure AI Tools…» карточек ИИ
+  (`org.jkiss.dbeaver.ui.ai.chat.controls.AIFunctionAllowMenu`);
+  динамический регистратор `PreferenceAliasRegistrar` удалён.
+
+**Отклонено.** Динамическая регистрация alias через `IExtensionRegistry.
+addContribution` — не работает без вендорского токена; второй экземпляр
+страницы под собственным id — дублирование пункта в дереве настроек.
+
+**Риск.** Если вендор в будущей версии зарегистрирует этот же id — возможен
+конфликт страниц; целевая версия DBeaver зафиксирована (26.2.2), риск принят.
+
+**Побочная находка.** P2-реконцилер dropins всё же подхватывает jar-ы из
+каталога установки `/usr/share/dbeaver-ce/dropins` — но только когда его
+область данных (`p2/`) доступна на запись; в системной установке она
+root-овая, поэтому штатная регистрация бандлов через `bundles.info`
+(см. ADR-7) остаётся основным механизмом.
