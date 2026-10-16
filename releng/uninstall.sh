@@ -42,6 +42,12 @@ else
     echo "   записей нет"
 fi
 
+echo "== Сброс кэша OSGi"
+# Equinox мог запомнить данные удалённых бандлов (см. примечание в install.sh);
+# кэш служебный и пересоздаётся при запуске DBeaver.
+rm -rf "$DBEAVER_HOME/configuration/org.eclipse.osgi"
+echo "   кэш сброшен (configuration/org.eclipse.osgi)"
+
 echo
 echo "Готово. Плагин удалён — перезапустите DBeaver."
 echo "Примечание: jar-ы .dbeaver-orig в plugins/ и настройки в рабочей среде"

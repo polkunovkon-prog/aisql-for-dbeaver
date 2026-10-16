@@ -82,6 +82,14 @@ mkdir -p "$DROPINS"
 cp -f "${JARS[@]}" "$DROPINS/"
 chmod 644 "$DROPINS"/com.pka.dbeaver.aisql.*.jar
 ls -l "$DROPINS"
+# Equinox кэширует данные бандлов в configuration/org.eclipse.osgi и при
+# совпадении пути и версии переиспользует старый манифест, даже если jar
+# заменён. Приёмочный тест 16.10.2026 показал, что из-за этого обновлённые
+# расширения игнорируются («The bundle is not marked as singleton»).
+# Кэш служебный и пересоздаётся при запуске — безопасно удаляем его всегда,
+# чтобы любая переустановка давала гарантированно свежее состояние.
+rm -rf "$DBEAVER_HOME/configuration/org.eclipse.osgi"
+echo "   кэш OSGi сброшен (configuration/org.eclipse.osgi)"
 
 # ---------------------------------------------------------------------------
 info "3/5 Регистрация бандлов (bundles.info)"
@@ -211,6 +219,11 @@ else
     if [ -n "${LOGFILE:-}" ] && [ -f "$LOGFILE" ]; then
         echo "   Последние строки журнала контрольного запуска:"
         tail -20 "$LOGFILE" || true
+    fi
+    if grep -rqs "com.pka.*are ignored" "$VERIFY_WS/.metadata" 2>/dev/null; then
+        echo "   ДИАГНОЗ: расширения плагина игнорируются Equinox (устаревший кэш OSGi)."
+        echo "   Запустите установку ещё раз — шаг 2 сбросит кэш; либо вручную:"
+        echo "   rm -rf $DBEAVER_HOME/configuration/org.eclipse.osgi"
     fi
 fi
 
