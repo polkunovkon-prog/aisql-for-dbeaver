@@ -49,6 +49,27 @@ info() { echo; echo "== $*"; }
 JARS=("$DIST_PLUGINS"/com.pka.dbeaver.aisql.*.jar)
 [ -e "${JARS[0]}" ] || die "не найдены собранные бандлы в $DIST_PLUGINS (сначала выполните ./releng/build.sh)"
 
+# Пользователь, чей DBeaver (и его кэши) обслуживаются: SUDO_USER при запуске
+# через sudo, иначе — владелец каталога проекта (типичный случай: su/root-сессия).
+CALLER="${SUDO_USER:-}"
+if [ -z "$CALLER" ] || [ "$CALLER" = "root" ]; then
+    CALLER="$(stat -c %U "$ROOT_DIR" 2>/dev/null || echo root)"
+fi
+CALLER_HOME=""
+if [ "$CALLER" != "root" ]; then
+    CALLER_HOME="$(getent passwd "$CALLER" 2>/dev/null | cut -d: -f6 || true)"
+    if [ -z "$CALLER_HOME" ] || [ ! -d "$CALLER_HOME" ]; then
+        CALLER="root"
+    fi
+fi
+
+# DBeaver пользователя должен быть закрыт: работающий процесс при выходе
+# перезапишет свой кэш, и сброс кэшей на шаге 2 не сработает.
+USER_DBEAVER_RUNNING=0
+if [ "$CALLER" != "root" ] && pgrep -u "$CALLER" -f "dbeaver-ce" >/dev/null 2>&1; then
+    USER_DBEAVER_RUNNING=1
+fi
+
 # ---------------------------------------------------------------------------
 info "1/5 Миграция: вывод старого плагина (восстановление jar-ов DBeaver)"
 restored=0
@@ -82,14 +103,39 @@ mkdir -p "$DROPINS"
 cp -f "${JARS[@]}" "$DROPINS/"
 chmod 644 "$DROPINS"/com.pka.dbeaver.aisql.*.jar
 ls -l "$DROPINS"
-# Equinox кэширует данные бандлов в configuration/org.eclipse.osgi и при
-# совпадении пути и версии переиспользует старый манифест, даже если jar
-# заменён. Приёмочный тест 16.10.2026 показал, что из-за этого обновлённые
-# расширения игнорируются («The bundle is not marked as singleton»).
-# Кэш служебный и пересоздаётся при запуске — безопасно удаляем его всегда,
+# Equinox кэширует данные бандлов (configuration/org.eclipse.osgi) и модель
+# реестра расширений (configuration/org.eclipse.core.runtime) и при совпадении
+# пути и версии переиспользует старые данные, даже если jar заменён.
+# Приёмочный тест 16.10.2026 показал оба проявления: «The bundle is not marked
+# as singleton» и попытку загрузки удалённого класса PreferenceAliasRegistrar.
+# Каталоги служебные и пересоздаются при запуске — безопасно удаляем всегда,
 # чтобы любая переустановка давала гарантированно свежее состояние.
-rm -rf "$DBEAVER_HOME/configuration/org.eclipse.osgi"
-echo "   кэш OSGi сброшен (configuration/org.eclipse.osgi)"
+for rel in org.eclipse.osgi org.eclipse.core.runtime; do
+    if [ -d "$DBEAVER_HOME/configuration/$rel" ]; then
+        rm -rf "$DBEAVER_HOME/configuration/$rel"
+        echo "   кэш OSGi сброшен ($DBEAVER_HOME/configuration/$rel)"
+    fi
+done
+# У пользовательских запусков свой (записываемый) каталог конфигурации: туда
+# launcher уводит конфигурацию, когда системная недоступна на запись
+# (на этой машине — ~/eclipse/configuration). Кэши пользователя живут там же.
+if [ "$CALLER" != "root" ] && [ -n "$CALLER_HOME" ]; then
+    shopt -s nullglob
+    for cfgdir in "$CALLER_HOME/eclipse/configuration" "$CALLER_HOME"/.eclipse/*/configuration; do
+        [ -d "$cfgdir" ] || continue
+        for rel in org.eclipse.osgi org.eclipse.core.runtime; do
+            if [ -d "$cfgdir/$rel" ]; then
+                rm -rf "$cfgdir/$rel"
+                echo "   кэш OSGi пользователя $CALLER сброшен ($cfgdir/$rel)"
+            fi
+        done
+    done
+    shopt -u nullglob
+    if [ "$USER_DBEAVER_RUNNING" = "1" ]; then
+        echo "   ВНИМАНИЕ: у $CALLER запущен DBeaver — закройте его и перезапустите"
+        echo "   установку, иначе работающий процесс восстановит кэш при выходе."
+    fi
+fi
 
 # ---------------------------------------------------------------------------
 info "3/5 Регистрация бандлов (bundles.info)"
@@ -116,19 +162,7 @@ grep -q "$MARKER" "$BUNDLES_INFO" || die "не удалось зарегистр
 info "4/5 Проверка загрузки плагина (headless-запуск под xvfb)"
 command -v xvfb-run >/dev/null 2>&1 || die "не найден xvfb-run. Установите пакет xvfb (sudo apt install xvfb) и запустите скрипт снова"
 
-# Пользователь, для которого проверяем запуск: SUDO_USER при запуске через sudo,
-# иначе — владелец каталога проекта (типичный случай: запуск из su/root-сессии).
-CALLER="${SUDO_USER:-}"
-if [ -z "$CALLER" ] || [ "$CALLER" = "root" ]; then
-    CALLER="$(stat -c %U "$ROOT_DIR" 2>/dev/null || echo root)"
-fi
-CALLER_HOME=""
-if [ "$CALLER" != "root" ]; then
-    CALLER_HOME="$(getent passwd "$CALLER" 2>/dev/null | cut -d: -f6 || true)"
-    if [ -z "$CALLER_HOME" ] || [ ! -d "$CALLER_HOME" ]; then
-        CALLER="root"
-    fi
-fi
+# CALLER/CALLER_HOME вычислены в начале скрипта (нужны шагу 2 для сброса кэшей).
 
 sweep() {
     # Добиваем осиротевшие процессы прежних запусков (наши шаблоны
@@ -190,9 +224,7 @@ try_verify() {
 
 sweep   # уборка хвостов до начала проверки
 
-USER_DBEAVER_RUNNING=0
-if [ "$CALLER" != "root" ] && pgrep -u "$CALLER" -f "dbeaver-ce" >/dev/null 2>&1; then
-    USER_DBEAVER_RUNNING=1
+if [ "$USER_DBEAVER_RUNNING" = "1" ]; then
     echo "   у пользователя $CALLER уже запущен DBeaver — проверка от его имени пропускается"
 fi
 

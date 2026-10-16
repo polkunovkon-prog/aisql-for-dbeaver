@@ -42,11 +42,33 @@ else
     echo "   записей нет"
 fi
 
-echo "== Сброс кэша OSGi"
-# Equinox мог запомнить данные удалённых бандлов (см. примечание в install.sh);
-# кэш служебный и пересоздаётся при запуске DBeaver.
-rm -rf "$DBEAVER_HOME/configuration/org.eclipse.osgi"
-echo "   кэш сброшен (configuration/org.eclipse.osgi)"
+echo "== Сброс кэшей OSGi"
+# Equinox мог запомнить данные удалённых бандлов и модель реестра расширений
+# (см. примечание в install.sh); кэши служебные и пересоздаются при запуске.
+for rel in org.eclipse.osgi org.eclipse.core.runtime; do
+    if [ -d "$DBEAVER_HOME/configuration/$rel" ]; then
+        rm -rf "$DBEAVER_HOME/configuration/$rel"
+        echo "   сброшен $DBEAVER_HOME/configuration/$rel"
+    fi
+done
+UCALLER="${SUDO_USER:-root}"
+UHOME=""
+if [ "$UCALLER" != "root" ]; then
+    UHOME="$(getent passwd "$UCALLER" 2>/dev/null | cut -d: -f6 || true)"
+fi
+if [ -n "${UHOME:-}" ] && [ -d "$UHOME" ]; then
+    shopt -s nullglob
+    for cfgdir in "$UHOME/eclipse/configuration" "$UHOME"/.eclipse/*/configuration; do
+        [ -d "$cfgdir" ] || continue
+        for rel in org.eclipse.osgi org.eclipse.core.runtime; do
+            if [ -d "$cfgdir/$rel" ]; then
+                rm -rf "$cfgdir/$rel"
+                echo "   сброшен $cfgdir/$rel"
+            fi
+        done
+    done
+    shopt -u nullglob
+fi
 
 echo
 echo "Готово. Плагин удалён — перезапустите DBeaver."
