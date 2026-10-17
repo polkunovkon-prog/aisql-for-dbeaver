@@ -26,8 +26,8 @@ cd ~/aisql-for-dbeaver
    `/usr/share/dbeaver-ce/plugins` (бэкапы `*.dbeaver-orig` исключаются);
 2. упаковывает бандлы в jar-ы с корректным `MANIFEST.MF`;
 3. раскладывает результат:
-   - `build/com.pka.dbeaver.aisql.core_1.2.0.jar`
-   - `build/com.pka.dbeaver.aisql.ui_1.2.0.jar`
+   - `build/com.pka.dbeaver.aisql.core_1.2.1.jar`
+   - `build/com.pka.dbeaver.aisql.ui_1.2.1.jar`
    - `dist/dropins/plugins/*.jar` — готовые к установке артефакты;
    - `dist/SHA256SUMS`, `dist/BUILD-INFO.txt` — контрольные суммы и паспорт сборки.
 
@@ -69,7 +69,7 @@ sudo ./releng/install.sh
 
 ### Шаг 2. Копирование бандлов и сброс кэшей Equinox
 
-`dist/dropins/plugins/com.pka.dbeaver.aisql.{core,ui}_1.2.0.jar` →
+`dist/dropins/plugins/com.pka.dbeaver.aisql.{core,ui}_1.2.1.jar` →
 `/usr/share/dbeaver-ce/dropins/plugins/` (штатный каталог расширений DBeaver).
 
 Далее шаг **безусловно сбрасывает кэши Equinox** (служебные каталоги,
@@ -96,8 +96,8 @@ sudo ./releng/install.sh
 (перед правкой создаётся копия файла с суффиксом `.aisql-install-backup-<дата>`):
 
 ```
-com.pka.dbeaver.aisql.core,1.2.0,file:/usr/share/dbeaver-ce/dropins/plugins/com.pka.dbeaver.aisql.core_1.2.0.jar,4,false
-com.pka.dbeaver.aisql.ui,1.2.0,file:/usr/share/dbeaver-ce/dropins/plugins/com.pka.dbeaver.aisql.ui_1.2.0.jar,4,false
+com.pka.dbeaver.aisql.core,1.2.1,file:/usr/share/dbeaver-ce/dropins/plugins/com.pka.dbeaver.aisql.core_1.2.1.jar,4,false
+com.pka.dbeaver.aisql.ui,1.2.1,file:/usr/share/dbeaver-ce/dropins/plugins/com.pka.dbeaver.aisql.ui_1.2.1.jar,4,false
 ```
 
 Шаг идемпотентен: уже существующие записи не дублируются.
@@ -173,8 +173,8 @@ sudo ./releng/uninstall.sh
 2. Дописать в `bundles.info` две строки (root; перед правкой сделать копию):
 
    ```
-   com.pka.dbeaver.aisql.core,1.2.0,file:/usr/share/dbeaver-ce/dropins/plugins/com.pka.dbeaver.aisql.core_1.2.0.jar,4,false
-   com.pka.dbeaver.aisql.ui,1.2.0,file:/usr/share/dbeaver-ce/dropins/plugins/com.pka.dbeaver.aisql.ui_1.2.0.jar,4,false
+   com.pka.dbeaver.aisql.core,1.2.1,file:/usr/share/dbeaver-ce/dropins/plugins/com.pka.dbeaver.aisql.core_1.2.1.jar,4,false
+   com.pka.dbeaver.aisql.ui,1.2.1,file:/usr/share/dbeaver-ce/dropins/plugins/com.pka.dbeaver.aisql.ui_1.2.1.jar,4,false
    ```
 
 3. Запустить DBeaver и проверить журнал.

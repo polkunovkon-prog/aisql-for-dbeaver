@@ -139,7 +139,21 @@ public final class AiEditClient {
 
     private static AIConfigurationProfile defaultProfile() throws DBException {
         AISettings settings = AISettingsManager.getStaticSettings();
-        AIConfigurationProfile profile = settings == null ? null : settings.getDefaultConfigurationOrNull();
+        if (settings == null) {
+            throw new DBException("В DBeaver не выбран профиль ИИ. "
+                + "Настройте модель в Preferences → AI (как для ИИ-чата) и повторите.");
+        }
+        if (settings.isAiDisabled()) {
+            throw new DBException("ИИ-интеграция DBeaver отключена "
+                + "(Preferences → AI). Включите её и повторите.");
+        }
+        // Токен профиля DBeaver хранит в защищённом хранилище и подтягивает
+        // лениво; штатный ИИ-чат делает это перед каждым запросом
+        // (AIAssistantImpl.checkAiEnablement). Без этого прямой движок
+        // падает с «OpenAI API token is not set», если чат ещё не
+        // запускался в текущей сессии DBeaver.
+        settings.resolveSecrets();
+        AIConfigurationProfile profile = settings.getDefaultConfigurationOrNull();
         if (profile == null) {
             throw new DBException("В DBeaver не выбран профиль ИИ. "
                 + "Настройте модель в Preferences → AI (как для ИИ-чата) и повторите.");

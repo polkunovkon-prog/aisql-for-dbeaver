@@ -347,9 +347,23 @@ public final class AiEditSession {
                 return;
             }
             disposePreview();
-            writeAudit("error", "ERROR", messageOf(error), null);
-            card.setError("Ошибка генерации: " + messageOf(error));
+            String message = messageOf(error);
+            writeAudit("error", "ERROR", message, null);
+            card.setError("Ошибка генерации: " + message + errorHint(message));
         });
+    }
+
+    /** Понятная подсказка к частым ошибкам генерации. */
+    private static String errorHint(String message) {
+        String lower = message == null ? "" : message.toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("request failed")) {
+            return " (сервер модели не ответил или оборвал соединение — "
+                + "проверьте, что он доступен и не перегружен)";
+        }
+        if (lower.contains("token is not set")) {
+            return " (в настройках ИИ DBeaver не задан API-ключ: Preferences → AI)";
+        }
+        return "";
     }
 
     // ----------------------------------------------------------------------

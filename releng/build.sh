@@ -19,7 +19,7 @@ DBEAVER_HOME="${DBEAVER_HOME:-/usr/share/dbeaver-ce}"
 PLUGINS_DIR="${PLUGINS_DIR:-$DBEAVER_HOME/plugins}"
 JAVAC="${JAVAC:-javac}"
 JAR="${JAR:-jar}"
-VERSION="1.2.0"
+VERSION="1.2.1"
 RELEASE="${JAVAC_RELEASE:-21}"
 
 OUT="$ROOT/build"
