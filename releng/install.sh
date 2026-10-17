@@ -9,9 +9,11 @@
 #   1) выводит старый плагин: восстанавливает jar-ы DBeaver из *.dbeaver-orig
 #      (патченые копии сохраняются рядом с суффиксом .aisql-install-backup-*;
 #      одинаковые файлы пропускаются — повторный запуск безопасен);
-#   2) копирует новые бандлы в <DBeaver>/dropins/plugins/;
-#   3) регистрирует бандлы: дописывает записи в bundles.info
-#      (копия исходного файла сохраняется; дубликаты не создаются);
+#   2) копирует новые бандлы в <DBeaver>/dropins/plugins/ (прежние версии
+#      нашего плагина там удаляются);
+#   3) перерегистрирует бандлы в bundles.info: строки плагина заменяются
+#      записями о новых jar-ах (копия исходного файла сохраняется; повторный
+#      запуск без изменений файл не трогает);
 #   4) проверяет загрузку плагина коротким headless-запуском DBeaver под xvfb:
 #      сначала от имени владельца проекта (повторяет реальный запуск),
 #      затем, при необходимости, от root; если проверить не удалось —
@@ -100,6 +102,9 @@ fi
 # ---------------------------------------------------------------------------
 info "2/5 Установка бандлов"
 mkdir -p "$DROPINS"
+# Прежние версии нашего плагина удаляются, чтобы при обновлении (1.0.0 →
+# 1.1.0) в dropins не оставалось старых jar-ов.
+rm -f "$DROPINS"/com.pka.dbeaver.aisql.*.jar
 cp -f "${JARS[@]}" "$DROPINS/"
 chmod 644 "$DROPINS"/com.pka.dbeaver.aisql.*.jar
 ls -l "$DROPINS"
@@ -143,23 +148,29 @@ fi
 
 # ---------------------------------------------------------------------------
 info "3/5 Регистрация бандлов (bundles.info)"
-added=0
+# Записи плагина перезаписываются целиком: при смене версии прежние строки
+# указывали бы на старые jar-ы, и Equinox загрузил бы бандл прежней версии
+# даже после обновления файлов. Записи других бандлов не трогаются.
+MARKER_RE='^com\.pka\.dbeaver\.aisql\.'
+new_entries="$(mktemp)"
+trap 'rm -f "$new_entries"' EXIT
 for jar in "$DROPINS"/com.pka.dbeaver.aisql.*.jar; do
     name="$(basename "$jar")"
     sym="${name%%_[0-9]*}"
     ver="$(echo "$name" | sed -E 's/^.*_([0-9][^_]*[0-9])\.jar$/\1/')"
-    if grep -q "^$sym," "$BUNDLES_INFO"; then
-        echo "   $sym — уже зарегистрирован"
-        continue
-    fi
-    if [ "$added" -eq 0 ]; then
-        cp -p "$BUNDLES_INFO" "$BUNDLES_INFO$BACKUP_SUFFIX-$(date +%Y%m%d-%H%M%S)"
-        echo "   копия прежнего bundles.info сохранена (…$BACKUP_SUFFIX-*)"
-    fi
-    printf '%s,%s,file:%s,4,false\n' "$sym" "$ver" "$jar" >> "$BUNDLES_INFO"
-    echo "   + $sym,$ver,file:$jar"
-    added=$((added + 1))
+    printf '%s,%s,file:%s,4,false\n' "$sym" "$ver" "$jar" >> "$new_entries"
 done
+if diff -q <(grep "$MARKER_RE" "$BUNDLES_INFO" || true) "$new_entries" >/dev/null 2>&1; then
+    echo "   записи актуальны — изменения не требуются"
+else
+    cp -p "$BUNDLES_INFO" "$BUNDLES_INFO$BACKUP_SUFFIX-$(date +%Y%m%d-%H%M%S)"
+    echo "   копия прежнего bundles.info сохранена (…$BACKUP_SUFFIX-*)"
+    sed -i "/$MARKER_RE/d" "$BUNDLES_INFO"
+    while IFS= read -r entry; do
+        printf '%s\n' "$entry" >> "$BUNDLES_INFO"
+        echo "   + ${entry%%,*}"
+    done < "$new_entries"
+fi
 grep -q "$MARKER" "$BUNDLES_INFO" || die "не удалось зарегистрировать бандлы в bundles.info"
 
 # ---------------------------------------------------------------------------
