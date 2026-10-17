@@ -64,6 +64,14 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
         "direct — применять сразу после генерации"
     };
 
+    private static final String[] EDIT_PREVIEW_VALUES = {
+        AisqlCore.EDIT_PREVIEW_DIFF, AisqlCore.EDIT_PREVIEW_FULL
+    };
+    private static final String[] EDIT_PREVIEW_LABELS = {
+        "diff — точечные замены: «было/стало» на местах, можно отметить нужные",
+        "full — весь новый фрагмент целиком под выделением"
+    };
+
     private Combo defaultProfileCombo;
     private Label defaultProfileDescription;
     private Table connectionProfilesTable;
@@ -81,6 +89,7 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
 
     private Button editEnabledCheck;
     private Combo editModeCombo;
+    private Combo editPreviewCombo;
     private Text editMaxCharsText;
     private Button editAuditCheck;
 
@@ -259,6 +268,12 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
         editModeCombo.setItems(EDIT_MODE_LABELS);
         editModeCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
 
+        Label previewLabel = new Label(group, SWT.NONE);
+        previewLabel.setText("Предпросмотр правки (edit.previewMode):");
+        editPreviewCombo = new Combo(group, SWT.READ_ONLY | SWT.DROP_DOWN);
+        editPreviewCombo.setItems(EDIT_PREVIEW_LABELS);
+        editPreviewCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+
         editMaxCharsText = createNumberField(group,
             "Максимум символов в выделении (edit.maxSelectionChars):", "4000", 8);
 
@@ -271,8 +286,10 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
         Label note = new Label(group, SWT.WRAP);
         note.setText("Фрагмент отправляется выбранной в DBeaver модели (той же, что у чата), "
             + "но в базе данных ничего не выполняется: правка только меняет текст редактора "
-            + "и отменяется одним Ctrl+Z. Кнопка «В чат» в карточке отправляет запрос "
-            + "в ИИ-чат без применения правки.");
+            + "и отменяется одним Ctrl+Z. В режиме «diff» изменения показываются на своих "
+            + "местах: «было» — красным с зачёркиванием, «стало» — зелёным; замены можно "
+            + "отмечать галочками, переход между ними — Alt+↑/↓. Кнопка «В чат» в карточке "
+            + "отправляет запрос в ИИ-чат без применения правки.");
         note.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
     }
 
@@ -372,6 +389,9 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
         String editMode = p.getProperty(
             AisqlCore.KEY_EDIT_APPLY_MODE, AisqlCore.EDIT_MODE_PREVIEW);
         editModeCombo.select(AisqlCore.EDIT_MODE_DIRECT.equalsIgnoreCase(editMode) ? 1 : 0);
+        String editPreview = p.getProperty(
+            AisqlCore.KEY_EDIT_PREVIEW_MODE, AisqlCore.EDIT_PREVIEW_DIFF);
+        editPreviewCombo.select(AisqlCore.EDIT_PREVIEW_FULL.equalsIgnoreCase(editPreview) ? 1 : 0);
         editMaxCharsText.setText(p.getProperty(AisqlCore.KEY_EDIT_MAX_SELECTION,
             String.valueOf(AisqlCore.DEFAULT_EDIT_MAX_SELECTION)));
         editAuditCheck.setSelection(
@@ -528,6 +548,10 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
             p.setProperty(AisqlCore.KEY_EDIT_APPLY_MODE,
                 editModeIndex < 0 ? AisqlCore.EDIT_MODE_PREVIEW
                     : EDIT_MODE_VALUES[editModeIndex]);
+            int previewIndex = editPreviewCombo.getSelectionIndex();
+            p.setProperty(AisqlCore.KEY_EDIT_PREVIEW_MODE,
+                previewIndex < 0 ? AisqlCore.EDIT_PREVIEW_DIFF
+                    : EDIT_PREVIEW_VALUES[previewIndex]);
             p.setProperty(AisqlCore.KEY_EDIT_MAX_SELECTION,
                 String.valueOf(parseNumber(editMaxCharsText, "edit.maxSelectionChars",
                     1, AisqlCore.HARD_MAX_EDIT_SELECTION)));

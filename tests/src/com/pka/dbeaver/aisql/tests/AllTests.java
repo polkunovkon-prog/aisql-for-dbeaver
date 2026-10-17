@@ -35,6 +35,7 @@ public final class AllTests {
         AisqlAuditTest.run();
         PromptBuilderTest.run();
         AiEditLogicTest.run();
+        AiEditDiffTest.run();
 
         int code = T.summary();
         System.out.println(code == 0 ? "ИТОГ: все проверки пройдены." : "ИТОГ: есть ошибки.");

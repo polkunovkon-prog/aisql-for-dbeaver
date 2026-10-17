@@ -95,6 +95,8 @@ public final class AisqlCore {
     public static final String KEY_EDIT_ENABLED = "edit.enabled";
     /** Режим применения: {@link #EDIT_MODE_PREVIEW} или {@link #EDIT_MODE_DIRECT}. */
     public static final String KEY_EDIT_APPLY_MODE = "edit.applyMode";
+    /** Вид предпросмотра: {@link #EDIT_PREVIEW_DIFF} или {@link #EDIT_PREVIEW_FULL}. */
+    public static final String KEY_EDIT_PREVIEW_MODE = "edit.previewMode";
     /** Максимум символов выделения для правки ИИ. */
     public static final String KEY_EDIT_MAX_SELECTION = "edit.maxSelectionChars";
     /** Записывать применения/отмены правок в журнал аудита. */
@@ -115,6 +117,10 @@ public final class AisqlCore {
     public static final String EDIT_MODE_PREVIEW = "preview";
     /** Режим применения правки: применять сразу после генерации. */
     public static final String EDIT_MODE_DIRECT = "direct";
+    /** Предпросмотр правки: точечные замены (дифф «было → стало» на местах). */
+    public static final String EDIT_PREVIEW_DIFF = "diff";
+    /** Предпросмотр правки: весь новый фрагмент целиком под выделением. */
+    public static final String EDIT_PREVIEW_FULL = "full";
     public static final int DEFAULT_EDIT_MAX_SELECTION = 4000;
     public static final int HARD_MAX_EDIT_SELECTION = 200000;
 
@@ -237,6 +243,7 @@ public final class AisqlCore {
         p.setProperty(KEY_MACROS_MAX_BYTES, String.valueOf(DEFAULT_MACROS_MAX_BYTES));
         p.setProperty(KEY_EDIT_ENABLED, "true");
         p.setProperty(KEY_EDIT_APPLY_MODE, EDIT_MODE_PREVIEW);
+        p.setProperty(KEY_EDIT_PREVIEW_MODE, EDIT_PREVIEW_DIFF);
         p.setProperty(KEY_EDIT_MAX_SELECTION, String.valueOf(DEFAULT_EDIT_MAX_SELECTION));
         p.setProperty(KEY_EDIT_AUDIT, "true");
         return p;
