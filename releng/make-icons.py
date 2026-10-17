@@ -92,7 +92,7 @@ def make_settings_icon(path):
 
 def main():
     base = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "..", "bundles", "com.pka.dbeaver.aisql.ui", "icons")
+                        "..", "bundles", "com.aisql.dbeaver.ui", "icons")
     os.makedirs(base, exist_ok=True)
     make_ask_icon(os.path.join(base, "aisql_ask.png"))
     make_settings_icon(os.path.join(base, "aisql_settings.png"))

@@ -19,7 +19,7 @@ DBEAVER_HOME="${DBEAVER_HOME:-/usr/share/dbeaver-ce}"
 PLUGINS_DIR="${PLUGINS_DIR:-$DBEAVER_HOME/plugins}"
 JAVAC="${JAVAC:-javac}"
 JAR="${JAR:-jar}"
-VERSION="1.2.1"
+VERSION="1.3.0"
 RELEASE="${JAVAC_RELEASE:-21}"
 
 OUT="$ROOT/build"
@@ -51,7 +51,7 @@ mkdir -p "$DIST/dropins/plugins"
 
 BUILT_JARS=()
 
-for BUNDLE in com.pka.dbeaver.aisql.core com.pka.dbeaver.aisql.ui; do
+for BUNDLE in com.aisql.dbeaver.core com.aisql.dbeaver.ui; do
     SRC="$ROOT/bundles/$BUNDLE"
     if [ ! -d "$SRC/src" ]; then
         echo "== Пропускаю $BUNDLE (нет исходников) =="

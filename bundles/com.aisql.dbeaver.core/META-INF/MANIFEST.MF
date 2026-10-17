@@ -1,0 +1,16 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: AI SQL Core for DBeaver
+Bundle-SymbolicName: com.aisql.dbeaver.core;singleton:=true
+Bundle-Version: 1.3.0
+Bundle-Vendor: AI SQL Plugin
+Bundle-Activator: com.aisql.dbeaver.core.AisqlCorePlugin
+Bundle-ActivationPolicy: lazy
+Bundle-RequiredExecutionEnvironment: JavaSE-21
+Export-Package: com.aisql.dbeaver.core
+Require-Bundle: org.eclipse.core.runtime,
+ org.eclipse.osgi,
+ org.jkiss.dbeaver.model,
+ org.jkiss.dbeaver.model.ai,
+ org.jkiss.dbeaver.model.sql,
+ org.jkiss.utils

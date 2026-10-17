@@ -48,9 +48,9 @@ sudo ./releng/uninstall.sh
 ## Состав репозитория
 
 ```
-bundles/com.pka.dbeaver.aisql.core/   OSGi-бандл: классификатор, политики, аудит,
+bundles/com.aisql.dbeaver.core/   OSGi-бандл: классификатор, политики, аудит,
                                       AI-функции (тулбокс db)
-bundles/com.pka.dbeaver.aisql.ui/     OSGi-бандл: команды, страница настроек,
+bundles/com.aisql.dbeaver.ui/     OSGi-бандл: команды, страница настроек,
                                       вставка промптов, правка выделения ИИ,
                                       иконки
 tests/src/                            офлайн-тесты (plain Java, без JUnit)

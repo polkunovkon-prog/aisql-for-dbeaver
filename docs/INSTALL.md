@@ -26,8 +26,8 @@ cd ~/aisql-for-dbeaver
    `/usr/share/dbeaver-ce/plugins` (бэкапы `*.dbeaver-orig` исключаются);
 2. упаковывает бандлы в jar-ы с корректным `MANIFEST.MF`;
 3. раскладывает результат:
-   - `build/com.pka.dbeaver.aisql.core_1.2.1.jar`
-   - `build/com.pka.dbeaver.aisql.ui_1.2.1.jar`
+   - `build/com.aisql.dbeaver.core_1.3.0.jar`
+   - `build/com.aisql.dbeaver.ui_1.3.0.jar`
    - `dist/dropins/plugins/*.jar` — готовые к установке артефакты;
    - `dist/SHA256SUMS`, `dist/BUILD-INFO.txt` — контрольные суммы и паспорт сборки.
 
@@ -69,7 +69,7 @@ sudo ./releng/install.sh
 
 ### Шаг 2. Копирование бандлов и сброс кэшей Equinox
 
-`dist/dropins/plugins/com.pka.dbeaver.aisql.{core,ui}_1.2.1.jar` →
+`dist/dropins/plugins/com.aisql.dbeaver.{core,ui}_1.3.0.jar` →
 `/usr/share/dbeaver-ce/dropins/plugins/` (штатный каталог расширений DBeaver).
 
 Далее шаг **безусловно сбрасывает кэши Equinox** (служебные каталоги,
@@ -96,8 +96,8 @@ sudo ./releng/install.sh
 (перед правкой создаётся копия файла с суффиксом `.aisql-install-backup-<дата>`):
 
 ```
-com.pka.dbeaver.aisql.core,1.2.1,file:/usr/share/dbeaver-ce/dropins/plugins/com.pka.dbeaver.aisql.core_1.2.1.jar,4,false
-com.pka.dbeaver.aisql.ui,1.2.1,file:/usr/share/dbeaver-ce/dropins/plugins/com.pka.dbeaver.aisql.ui_1.2.1.jar,4,false
+com.aisql.dbeaver.core,1.3.0,file:/usr/share/dbeaver-ce/dropins/plugins/com.aisql.dbeaver.core_1.3.0.jar,4,false
+com.aisql.dbeaver.ui,1.3.0,file:/usr/share/dbeaver-ce/dropins/plugins/com.aisql.dbeaver.ui_1.3.0.jar,4,false
 ```
 
 Шаг идемпотентен: уже существующие записи не дублируются.
@@ -145,6 +145,11 @@ jar-ы плагина и перезаписывает его записи в `bu
 бандлов не трогаются; перед правкой сохраняется копия файла). Если ничего
 не менялось, повторный запуск `bundles.info` не переписывает.
 
+Обновление с версий ≤ 1.2.1 (прежнее пространство имён `com.pka.dbeaver.aisql.*`)
+поддерживается автоматически: `install.sh` дополнительно удаляет jar-ы
+`com.pka.dbeaver.aisql.*` и их строки в `bundles.info` — оба комплекта снимаются
+начисто. Настройки и журнал аудита в рабочей среде при этом не трогаются.
+
 Перед повторной установкой закройте DBeaver (см. примечание в п. 4): шаг 2
 сбросит кэши Equinox, поэтому обновлённый jar подхватывается гарантированно —
 без сброса Equinox мог бы переиспользовать данные старого бандла при том же
@@ -173,8 +178,8 @@ sudo ./releng/uninstall.sh
 2. Дописать в `bundles.info` две строки (root; перед правкой сделать копию):
 
    ```
-   com.pka.dbeaver.aisql.core,1.2.1,file:/usr/share/dbeaver-ce/dropins/plugins/com.pka.dbeaver.aisql.core_1.2.1.jar,4,false
-   com.pka.dbeaver.aisql.ui,1.2.1,file:/usr/share/dbeaver-ce/dropins/plugins/com.pka.dbeaver.aisql.ui_1.2.1.jar,4,false
+   com.aisql.dbeaver.core,1.3.0,file:/usr/share/dbeaver-ce/dropins/plugins/com.aisql.dbeaver.core_1.3.0.jar,4,false
+   com.aisql.dbeaver.ui,1.3.0,file:/usr/share/dbeaver-ce/dropins/plugins/com.aisql.dbeaver.ui_1.3.0.jar,4,false
    ```
 
 3. Запустить DBeaver и проверить журнал.
@@ -183,7 +188,7 @@ sudo ./releng/uninstall.sh
 
 | Симптом | Что проверить |
 |---|---|
-| Страницы настроек нет | письмена `com.pka.dbeaver.aisql` в `bundles.info`; права на чтение jar-ов (`chmod 644`) |
+| Страницы настроек нет | письмена `com.aisql.dbeaver` в `bundles.info`; права на чтение jar-ов (`chmod 644`) |
 | В чате нет функций `db_*` | страница Preferences → AI → «Инструменты ИИ»: функции должны быть включены (набор «db» включён по умолчанию) |
 | Хоткей не срабатывает | конфликт привязок: `Window → Preferences → Keys` найди команду «Спросить ИИ…» и назначьте свободную комбинацию |
 | `install.sh` не находит DBeaver | задайте `DBEAVER_HOME` / `LAUNCHER` |

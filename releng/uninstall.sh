@@ -5,7 +5,8 @@
 # ЗАПУСКАЕТСЯ ОТ ROOT:
 #   sudo ./releng/uninstall.sh
 #
-# Удаляет бандлы из dropins/plugins и записи из bundles.info.
+# Удаляет бандлы из dropins/plugins и записи из bundles.info (текущий комплект
+# com.aisql.dbeaver.* и прежний com.pka.dbeaver.aisql.* — переименование 1.3.0).
 # Настройки, журнал аудита и макросы в рабочей среде пользователя
 # НЕ удаляются (их можно удалить вручную, см. docs/SECURITY.md).
 #
@@ -14,7 +15,8 @@ set -euo pipefail
 DBEAVER_HOME="${DBEAVER_HOME:-/usr/share/dbeaver-ce}"
 DROPINS="$DBEAVER_HOME/dropins/plugins"
 BUNDLES_INFO="$DBEAVER_HOME/configuration/org.eclipse.equinox.simpleconfigurator/bundles.info"
-MARKER="com.pka.dbeaver.aisql"
+MARKER="com.aisql.dbeaver"
+LEGACY_MARKER="com.pka.dbeaver.aisql"  # прежнее имя бандлов (до переименования в 1.3.0)
 BACKUP_SUFFIX=".aisql-uninstall-backup"
 
 die() { echo "ОШИБКА: $*" >&2; exit 1; }
@@ -25,7 +27,7 @@ die() { echo "ОШИБКА: $*" >&2; exit 1; }
 echo "== Удаление бандлов из $DROPINS"
 shopt -s nullglob
 removed=0
-for jar in "$DROPINS"/com.pka.dbeaver.aisql.*.jar; do
+for jar in "$DROPINS"/com.aisql.dbeaver.*.jar "$DROPINS"/com.pka.dbeaver.aisql.*.jar; do
     rm -f "$jar"
     removed=$((removed + 1))
 done
@@ -33,9 +35,9 @@ shopt -u nullglob
 echo "   удалено файлов: $removed"
 
 echo "== Очистка записей в bundles.info"
-if [ -f "$BUNDLES_INFO" ] && grep -q "$MARKER" "$BUNDLES_INFO"; then
+if [ -f "$BUNDLES_INFO" ] && grep -q -e "$MARKER" -e "$LEGACY_MARKER" "$BUNDLES_INFO"; then
     cp -p "$BUNDLES_INFO" "$BUNDLES_INFO$BACKUP_SUFFIX-$(date +%Y%m%d-%H%M%S)"
-    grep -v "$MARKER" "$BUNDLES_INFO" > "$BUNDLES_INFO.tmp"
+    grep -v -e "$MARKER" -e "$LEGACY_MARKER" "$BUNDLES_INFO" > "$BUNDLES_INFO.tmp"
     mv "$BUNDLES_INFO.tmp" "$BUNDLES_INFO"
     echo "   записи удалены (копия bundles.info сохранена как ...$BACKUP_SUFFIX-*)"
 else

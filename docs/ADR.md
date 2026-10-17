@@ -11,8 +11,8 @@
 (`*.jar.dbeaver-orig` — побочный след). Патчи ломаются при каждом обновлении
 DBeaver и смешивают наш код с вендорным.
 
-**Решение.** Два бандла: `com.pka.dbeaver.aisql.core` (классификация, политики,
-аудит, AI-функции) и `com.pka.dbeaver.aisql.ui` (команды, настройки, промпты,
+**Решение.** Два бандла: `com.aisql.dbeaver.core` (классификация, политики,
+аудит, AI-функции) и `com.aisql.dbeaver.ui` (команды, настройки, промпты,
 иконки). Регистрация — только штатные точки расширения
 (`com.dbeaver.ai.function`, `org.eclipse.ui.*`), вендорные jar-ы не изменяются.
 
@@ -145,7 +145,7 @@ AI-функции — реальные значения остаются лок�
 **Контекст.** При первом интерфейсном тесте ИИ-чат сообщил об отсутствии
 инструментов выполнения SQL, хотя бандлы грузились. Диагностика по `.log`:
 Equinox игнорировал расширения ядра без `singleton:=true` («The extensions
-and extension-points from the bundle "com.pka.dbeaver.aisql.core" are
+and extension-points from the bundle "com.aisql.dbeaver.core" are
 ignored. The bundle is not marked as singleton»), а динамическая
 регистрация alias-страницы падала («Unauthorized access to the
 ExtensionRegistry.addContribution() method» — Equinox требует служебный
@@ -153,7 +153,7 @@ ExtensionRegistry.addContribution() method» — Equinox требует служ
 
 **Решение.**
 
-- `Bundle-SymbolicName: com.pka.dbeaver.aisql.core;singleton:=true` —
+- `Bundle-SymbolicName: com.aisql.dbeaver.core;singleton:=true` —
   штатное требование Eclipse к бандлам, дающим точки расширения;
 - страница настроек регистрируется **статически** под id
   `com.dbeaver.preferences.ai.tools` — именно его открывает пункт
@@ -236,7 +236,7 @@ Eclipse в домашнем каталоге (`~/eclipse/configuration`,
 
 - Стратегия — «в редакторе» (inline); отдельное окно не понадобилось:
   проверка публичных API показала, что всё реализуемо без патчей.
-- Команда `com.pka.dbeaver.aisql.commands.editSelection` (`Ctrl+Alt+E`
+- Команда `com.aisql.dbeaver.commands.editSelection` (`Ctrl+Alt+E`
   в контексте SQL-редактора, пункт контекстного меню) + карточка (`Dialog`):
   поле инструкции (`Enter` — сгенерировать, `Esc` — отмена), кнопки
   «Сгенерировать» / «Применить» / «В чат» / «Отмена». Окно немодальное

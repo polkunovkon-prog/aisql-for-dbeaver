@@ -1,5 +1,21 @@
 # История версий
 
+## 1.3.0 — 2026-10-17
+
+**Изменено**
+
+- пространство имён переименовано: `com.pka.dbeaver.aisql.*` → `com.aisql.dbeaver.*` —
+  пакеты и каталоги исходников (`bundles/com.aisql.dbeaver.core`,
+  `bundles/com.aisql.dbeaver.ui`, `tests/src/com/aisql/dbeaver/tests`),
+  id бандлов и имена jar-ов (`com.aisql.dbeaver.core_1.3.0.jar`,
+  `com.aisql.dbeaver.ui_1.3.0.jar`);
+- `install.sh` при обновлении сам снимает прежний комплект
+  `com.pka.dbeaver.aisql.*` из `dropins/plugins` и `bundles.info`
+  (иначе Equinox попытался бы загрузить удалённые jar-ы);
+  `uninstall.sh` удаляет оба комплекта;
+- поведение, горячие клавиши, настройки (`ai-sql-plugin.properties`) и журнал
+  аудита (`ai-sql-audit.jsonl`) не менялись: пути к ним от id бандла не зависят.
+
 ## 1.2.1 — 2026-10-17
 
 **Исправлено**
@@ -64,7 +80,7 @@
 
 **Новое**
 
-- команда `com.pka.dbeaver.aisql.commands.editSelection` (`Ctrl+Alt+E`
+- команда `com.aisql.dbeaver.commands.editSelection` (`Ctrl+Alt+E`
   в SQL-редакторе) + пункт контекстного меню «Править выделенное ИИ»;
 - карточка правки: поле инструкции (Enter — сгенерировать, Esc — отмена),
   кнопки «Сгенерировать», «Применить», «В чат», «Отмена»;
@@ -106,8 +122,8 @@
 
 **Состав**
 
-- два бандла: `com.pka.dbeaver.aisql.core` (логика, функции) и
-  `com.pka.dbeaver.aisql.ui` (команды, страница настроек, промпты);
+- два бандла: `com.aisql.dbeaver.core` (логика, функции) и
+  `com.aisql.dbeaver.ui` (команды, страница настроек, промпты);
 - 11 функций тулбокса `db` в штатной точке расширения `com.dbeaver.ai.function`
   (`runQuery`, `executeSql`, `getContext`, `listObjects`, `getObjectDdl`,
   `explain`, `help`, `listMacros`, `runMacro`, `defineMacro`, `deleteMacro`);

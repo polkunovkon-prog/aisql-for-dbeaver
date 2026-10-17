@@ -10,10 +10,11 @@
 #      (патченые копии сохраняются рядом с суффиксом .aisql-install-backup-*;
 #      одинаковые файлы пропускаются — повторный запуск безопасен);
 #   2) копирует новые бандлы в <DBeaver>/dropins/plugins/ (прежние версии
-#      нашего плагина там удаляются);
+#      нашего плагина там удаляются, включая комплект com.pka.dbeaver.aisql.*
+#      с прежним пространством имён — переименование в 1.3.0);
 #   3) перерегистрирует бандлы в bundles.info: строки плагина заменяются
-#      записями о новых jar-ах (копия исходного файла сохраняется; повторный
-#      запуск без изменений файл не трогает);
+#      записями о новых jar-ах, строки прежнего комплекта удаляются (копия
+#      исходного файла сохраняется; повторный запуск без изменений файл не трогает);
 #   4) проверяет загрузку плагина коротким headless-запуском DBeaver под xvfb:
 #      сначала от имени владельца проекта (повторяет реальный запуск),
 #      затем, при необходимости, от root; если проверить не удалось —
@@ -32,7 +33,8 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 DIST_PLUGINS="$SCRIPT_DIR/../dist/dropins/plugins"
 DROPINS="$DBEAVER_HOME/dropins/plugins"
 BUNDLES_INFO="$DBEAVER_HOME/configuration/org.eclipse.equinox.simpleconfigurator/bundles.info"
-MARKER="com.pka.dbeaver.aisql"
+MARKER="com.aisql.dbeaver"
+LEGACY_MARKER="com.pka.dbeaver.aisql"  # прежнее имя бандлов (до переименования в 1.3.0)
 BACKUP_SUFFIX=".aisql-install-backup"
 WORK_DIR="/tmp/aisql-install"          # каталог прошлых версий скрипта (для уборки хвостов)
 VERIFY_DIR="/tmp/aisql-verify"         # рабочая среда контрольного запуска
@@ -48,7 +50,7 @@ info() { echo; echo "== $*"; }
 [ -d "$DBEAVER_HOME" ] || die "не найден каталог DBeaver: $DBEAVER_HOME"
 [ -f "$BUNDLES_INFO" ] || die "не найден $BUNDLES_INFO"
 
-JARS=("$DIST_PLUGINS"/com.pka.dbeaver.aisql.*.jar)
+JARS=("$DIST_PLUGINS"/com.aisql.dbeaver.*.jar)
 [ -e "${JARS[0]}" ] || die "не найдены собранные бандлы в $DIST_PLUGINS (сначала выполните ./releng/build.sh)"
 
 # Пользователь, чей DBeaver (и его кэши) обслуживаются: SUDO_USER при запуске
@@ -103,10 +105,12 @@ fi
 info "2/5 Установка бандлов"
 mkdir -p "$DROPINS"
 # Прежние версии нашего плагина удаляются, чтобы при обновлении (1.0.0 →
-# 1.1.0) в dropins не оставалось старых jar-ов.
+# 1.1.0) в dropins не оставалось старых jar-ов. Отдельно снимается комплект
+# com.pka.dbeaver.aisql.* — пространство имён до переименования в 1.3.0.
+rm -f "$DROPINS"/com.aisql.dbeaver.*.jar
 rm -f "$DROPINS"/com.pka.dbeaver.aisql.*.jar
 cp -f "${JARS[@]}" "$DROPINS/"
-chmod 644 "$DROPINS"/com.pka.dbeaver.aisql.*.jar
+chmod 644 "$DROPINS"/com.aisql.dbeaver.*.jar
 ls -l "$DROPINS"
 # Equinox кэширует данные бандлов (configuration/org.eclipse.osgi) и модель
 # реестра расширений (configuration/org.eclipse.core.runtime) и при совпадении
@@ -151,27 +155,41 @@ info "3/5 Регистрация бандлов (bundles.info)"
 # Записи плагина перезаписываются целиком: при смене версии прежние строки
 # указывали бы на старые jar-ы, и Equinox загрузил бы бандл прежней версии
 # даже после обновления файлов. Записи других бандлов не трогаются.
-MARKER_RE='^com\.pka\.dbeaver\.aisql\.'
+# Плюс безусловно удаляются строки прежнего комплекта com.pka.dbeaver.aisql.*
+# (пространство имён до переименования в 1.3.0): они указывают на уже
+# удалённые jar-ы и сломали бы загрузку Equinox.
+MARKER_RE='^com\.aisql\.dbeaver\.'
+LEGACY_RE='^com\.pka\.dbeaver\.aisql\.'
 new_entries="$(mktemp)"
 trap 'rm -f "$new_entries"' EXIT
-for jar in "$DROPINS"/com.pka.dbeaver.aisql.*.jar; do
+for jar in "$DROPINS"/com.aisql.dbeaver.*.jar; do
     name="$(basename "$jar")"
     sym="${name%%_[0-9]*}"
     ver="$(echo "$name" | sed -E 's/^.*_([0-9][^_]*[0-9])\.jar$/\1/')"
     printf '%s,%s,file:%s,4,false\n' "$sym" "$ver" "$jar" >> "$new_entries"
 done
-if diff -q <(grep "$MARKER_RE" "$BUNDLES_INFO" || true) "$new_entries" >/dev/null 2>&1; then
+legacy_left=0
+if grep -q "$LEGACY_RE" "$BUNDLES_INFO"; then
+    legacy_left=1
+fi
+if [ "$legacy_left" = "0" ] && diff -q <(grep "$MARKER_RE" "$BUNDLES_INFO" || true) "$new_entries" >/dev/null 2>&1; then
     echo "   записи актуальны — изменения не требуются"
 else
     cp -p "$BUNDLES_INFO" "$BUNDLES_INFO$BACKUP_SUFFIX-$(date +%Y%m%d-%H%M%S)"
     echo "   копия прежнего bundles.info сохранена (…$BACKUP_SUFFIX-*)"
-    sed -i "/$MARKER_RE/d" "$BUNDLES_INFO"
+    sed -i -e "/$MARKER_RE/d" -e "/$LEGACY_RE/d" "$BUNDLES_INFO"
+    if [ "$legacy_left" = "1" ]; then
+        echo "   снят прежний комплект com.pka.dbeaver.aisql (переименование 1.3.0)"
+    fi
     while IFS= read -r entry; do
         printf '%s\n' "$entry" >> "$BUNDLES_INFO"
         echo "   + ${entry%%,*}"
     done < "$new_entries"
 fi
 grep -q "$MARKER" "$BUNDLES_INFO" || die "не удалось зарегистрировать бандлы в bundles.info"
+if grep -q "$LEGACY_RE" "$BUNDLES_INFO"; then
+    die "в bundles.info остались записи прежнего комплекта com.pka.dbeaver.aisql"
+fi
 
 # ---------------------------------------------------------------------------
 info "4/5 Проверка загрузки плагина (headless-запуск под xvfb)"
@@ -267,7 +285,7 @@ else
         echo "   Последние строки журнала контрольного запуска:"
         tail -20 "$LOGFILE" || true
     fi
-    if grep -rqs "com.pka.*are ignored" "$VERIFY_WS/.metadata" 2>/dev/null; then
+    if grep -rqs "com.aisql.*are ignored" "$VERIFY_WS/.metadata" 2>/dev/null; then
         echo "   ДИАГНОЗ: расширения плагина игнорируются Equinox (устаревший кэш OSGi)."
         echo "   Запустите установку ещё раз — шаг 2 сбросит кэш; либо вручную:"
         echo "   rm -rf $DBEAVER_HOME/configuration/org.eclipse.osgi"

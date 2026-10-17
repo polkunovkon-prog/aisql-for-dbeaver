@@ -17,8 +17,8 @@ echo "== Сборка бандлов =="
 "$ROOT/releng/build.sh" | tail -4
 
 CP="$(find "$PLUGINS_DIR" -maxdepth 1 -name '*.jar' ! -name '*.dbeaver-orig' | sort | tr '\n' ':')"
-CP="$CP$ROOT/build/com.pka.dbeaver.aisql.core/classes"
-CP="$CP:$ROOT/build/com.pka.dbeaver.aisql.ui/classes"
+CP="$CP$ROOT/build/com.aisql.dbeaver.core/classes"
+CP="$CP:$ROOT/build/com.aisql.dbeaver.ui/classes"
 
 TEST_OUT="$ROOT/build/tests"
 rm -rf "$TEST_OUT"
@@ -30,4 +30,4 @@ javac --release 21 -encoding UTF-8 -Xlint:-options \
     -cp "$CP" -d "$TEST_OUT" "@$ROOT/build/test-sources.txt"
 
 echo "== Запуск тестов =="
-java -cp "$TEST_OUT:$CP" com.pka.dbeaver.aisql.tests.AllTests
+java -cp "$TEST_OUT:$CP" com.aisql.dbeaver.tests.AllTests
