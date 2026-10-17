@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: AI SQL UI for DBeaver
 Bundle-SymbolicName: com.pka.dbeaver.aisql.ui;singleton:=true
-Bundle-Version: 1.0.0
+Bundle-Version: 1.1.0
 Bundle-Vendor: AI SQL Plugin
 Bundle-Activator: com.pka.dbeaver.aisql.ui.AisqlUIPlugin
 Bundle-ActivationPolicy: lazy
@@ -20,7 +20,9 @@ Require-Bundle: com.pka.dbeaver.aisql.core,
  org.eclipse.ui,
  org.eclipse.ui.workbench,
  org.jkiss.dbeaver.model,
+ org.jkiss.dbeaver.model.ai,
  org.jkiss.dbeaver.ui,
  org.jkiss.dbeaver.ui.ai,
+ org.jkiss.dbeaver.ui.editors.base,
  org.jkiss.dbeaver.ui.editors.sql,
  org.jkiss.dbeaver.ui.editors.data

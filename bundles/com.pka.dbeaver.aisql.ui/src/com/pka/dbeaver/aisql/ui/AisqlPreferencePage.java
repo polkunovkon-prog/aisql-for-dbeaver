@@ -56,6 +56,14 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
 
     private static final String[] PROFILES = { "READ_ONLY", "STANDARD", "FULL" };
 
+    private static final String[] EDIT_MODE_VALUES = {
+        AisqlCore.EDIT_MODE_PREVIEW, AisqlCore.EDIT_MODE_DIRECT
+    };
+    private static final String[] EDIT_MODE_LABELS = {
+        "preview — предпросмотр, применять по кнопке",
+        "direct — применять сразу после генерации"
+    };
+
     private Combo defaultProfileCombo;
     private Label defaultProfileDescription;
     private Table connectionProfilesTable;
@@ -70,6 +78,11 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
 
     private Button maskEnabledCheck;
     private Text maskRulesText;
+
+    private Button editEnabledCheck;
+    private Combo editModeCombo;
+    private Text editMaxCharsText;
+    private Button editAuditCheck;
 
     private Button auditEnabledCheck;
     private Button auditRedactCheck;
@@ -97,6 +110,7 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
         createProfilesSection(composite);
         createLimitsSection(composite);
         createMaskingSection(composite);
+        createEditSection(composite);
         createAuditSection(composite);
         createBottomSection(composite);
 
@@ -231,6 +245,37 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
         note.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
     }
 
+    private void createEditSection(Composite parent) {
+        Group group = createGroup(parent, "Правка выделения с ИИ в редакторе (Ctrl+Alt+E)");
+
+        editEnabledCheck = new Button(group, SWT.CHECK);
+        editEnabledCheck.setText("Включить правку выделенного фрагмента SQL по инструкции ИИ");
+        editEnabledCheck.setLayoutData(
+            new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+
+        Label modeLabel = new Label(group, SWT.NONE);
+        modeLabel.setText("Применение (edit.applyMode):");
+        editModeCombo = new Combo(group, SWT.READ_ONLY | SWT.DROP_DOWN);
+        editModeCombo.setItems(EDIT_MODE_LABELS);
+        editModeCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+
+        editMaxCharsText = createNumberField(group,
+            "Максимум символов в выделении (edit.maxSelectionChars):", "4000", 8);
+
+        editAuditCheck = new Button(group, SWT.CHECK);
+        editAuditCheck.setText("Записывать применения/отмены правок в журнал аудита "
+            + "(edit.audit)");
+        editAuditCheck.setLayoutData(
+            new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+
+        Label note = new Label(group, SWT.WRAP);
+        note.setText("Фрагмент отправляется выбранной в DBeaver модели (той же, что у чата), "
+            + "но в базе данных ничего не выполняется: правка только меняет текст редактора "
+            + "и отменяется одним Ctrl+Z. Кнопка «В чат» в карточке отправляет запрос "
+            + "в ИИ-чат без применения правки.");
+        note.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+    }
+
     private void createAuditSection(Composite parent) {
         Group group = createGroup(parent, "Журнал аудита");
 
@@ -321,6 +366,16 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
         maskEnabledCheck.setSelection(
             Boolean.parseBoolean(p.getProperty(MaskingRules.KEY_ENABLED, "true")));
         maskRulesText.setText(p.getProperty(MaskingRules.KEY_RULES, ""));
+
+        editEnabledCheck.setSelection(
+            Boolean.parseBoolean(p.getProperty(AisqlCore.KEY_EDIT_ENABLED, "true")));
+        String editMode = p.getProperty(
+            AisqlCore.KEY_EDIT_APPLY_MODE, AisqlCore.EDIT_MODE_PREVIEW);
+        editModeCombo.select(AisqlCore.EDIT_MODE_DIRECT.equalsIgnoreCase(editMode) ? 1 : 0);
+        editMaxCharsText.setText(p.getProperty(AisqlCore.KEY_EDIT_MAX_SELECTION,
+            String.valueOf(AisqlCore.DEFAULT_EDIT_MAX_SELECTION)));
+        editAuditCheck.setSelection(
+            Boolean.parseBoolean(p.getProperty(AisqlCore.KEY_EDIT_AUDIT, "true")));
 
         auditEnabledCheck.setSelection(
             Boolean.parseBoolean(p.getProperty(AisqlCore.KEY_AUDIT_ENABLED, "true")));
@@ -466,6 +521,18 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
             p.setProperty(MaskingRules.KEY_ENABLED,
                 String.valueOf(maskEnabledCheck.getSelection()));
             p.setProperty(MaskingRules.KEY_RULES, multiLine(maskRulesText));
+
+            p.setProperty(AisqlCore.KEY_EDIT_ENABLED,
+                String.valueOf(editEnabledCheck.getSelection()));
+            int editModeIndex = editModeCombo.getSelectionIndex();
+            p.setProperty(AisqlCore.KEY_EDIT_APPLY_MODE,
+                editModeIndex < 0 ? AisqlCore.EDIT_MODE_PREVIEW
+                    : EDIT_MODE_VALUES[editModeIndex]);
+            p.setProperty(AisqlCore.KEY_EDIT_MAX_SELECTION,
+                String.valueOf(parseNumber(editMaxCharsText, "edit.maxSelectionChars",
+                    1, AisqlCore.HARD_MAX_EDIT_SELECTION)));
+            p.setProperty(AisqlCore.KEY_EDIT_AUDIT,
+                String.valueOf(editAuditCheck.getSelection()));
 
             p.setProperty(AisqlCore.KEY_AUDIT_ENABLED,
                 String.valueOf(auditEnabledCheck.getSelection()));

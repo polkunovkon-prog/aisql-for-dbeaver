@@ -4,7 +4,8 @@
   AI SQL for DBeaver — UI-бандл:
     - страница настроек (категория AI); id страницы — com.dbeaver.preferences.ai.tools
       (именно его открывает меню «Настроить инструменты» в карточке ИИ);
-    - команды «спросить ИИ о выделенном» (SQL-редактор) и «спросить ИИ
+    - команды «спросить ИИ о выделенном» (SQL-редактор), «править
+      выделенное ИИ» (SQL-редактор, Ctrl+Alt+E) и «спросить ИИ
       о данных» (таблица результатов) с горячими клавишами;
     - кнопка настроек в панели ИИ-чата.
 -->
@@ -40,6 +41,10 @@
             id="com.pka.dbeaver.aisql.commands.openSettings"
             categoryId="com.pka.dbeaver.aisql.commands.category"
             name="%command.openSettings.name"/>
+      <command
+            id="com.pka.dbeaver.aisql.commands.editSelection"
+            categoryId="com.pka.dbeaver.aisql.commands.category"
+            name="%command.editSelection.name"/>
    </extension>
 
    <extension point="org.eclipse.ui.handlers">
@@ -52,6 +57,9 @@
       <handler
             class="com.pka.dbeaver.aisql.ui.handlers.OpenSettingsHandler"
             commandId="com.pka.dbeaver.aisql.commands.openSettings"/>
+      <handler
+            class="com.pka.dbeaver.aisql.ui.handlers.EditSelectionWithAiHandler"
+            commandId="com.pka.dbeaver.aisql.commands.editSelection"/>
    </extension>
 
    <extension point="org.eclipse.ui.menus">
@@ -63,6 +71,18 @@
                icon="icons/aisql_ask.png"
                label="%menu.askSelection.label"
                tooltip="%menu.askSelection.tooltip">
+            <visibleWhen checkEnabled="false">
+               <with variable="activeEditor">
+                  <test property="org.jkiss.dbeaver.ui.editors.sql.hasSelection" value="true"/>
+               </with>
+            </visibleWhen>
+         </command>
+         <!-- Правка выделения прямо в редакторе: предпросмотр и применение. -->
+         <command
+               commandId="com.pka.dbeaver.aisql.commands.editSelection"
+               icon="icons/aisql_ask.png"
+               label="%menu.editSelection.label"
+               tooltip="%menu.editSelection.tooltip">
             <visibleWhen checkEnabled="false">
                <with variable="activeEditor">
                   <test property="org.jkiss.dbeaver.ui.editors.sql.hasSelection" value="true"/>
@@ -101,6 +121,11 @@
             contextId="org.jkiss.dbeaver.ui.context.resultset"
             schemeId="org.eclipse.ui.defaultAcceleratorConfiguration"
             sequence="M1+M3+I"/>
+      <key
+            commandId="com.pka.dbeaver.aisql.commands.editSelection"
+            contextId="org.jkiss.dbeaver.ui.editors.sql"
+            schemeId="org.eclipse.ui.defaultAcceleratorConfiguration"
+            sequence="M1+M3+E"/>
    </extension>
 
    <extension point="org.eclipse.ui.commandImages">
@@ -113,6 +138,9 @@
       <image
             commandId="com.pka.dbeaver.aisql.commands.openSettings"
             icon="icons/aisql_settings.png"/>
+      <image
+            commandId="com.pka.dbeaver.aisql.commands.editSelection"
+            icon="icons/aisql_ask.png"/>
    </extension>
 
    <extension point="org.eclipse.ui.startup">

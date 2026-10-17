@@ -34,6 +34,7 @@ public final class AllTests {
         QueryPolicyTest.run();
         AisqlAuditTest.run();
         PromptBuilderTest.run();
+        AiEditLogicTest.run();
 
         int code = T.summary();
         System.out.println(code == 0 ? "ИТОГ: все проверки пройдены." : "ИТОГ: есть ошибки.");

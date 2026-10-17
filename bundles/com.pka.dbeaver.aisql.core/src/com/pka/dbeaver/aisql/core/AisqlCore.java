@@ -90,6 +90,16 @@ public final class AisqlCore {
     /** Предел размера одного макроса (байт). */
     public static final String KEY_MACROS_MAX_BYTES = "macros.maxBytes";
 
+    // --- Правка выделения ИИ в SQL-редакторе (Ctrl+Alt+E) ---
+    /** Включена ли правка выделения ИИ. */
+    public static final String KEY_EDIT_ENABLED = "edit.enabled";
+    /** Режим применения: {@link #EDIT_MODE_PREVIEW} или {@link #EDIT_MODE_DIRECT}. */
+    public static final String KEY_EDIT_APPLY_MODE = "edit.applyMode";
+    /** Максимум символов выделения для правки ИИ. */
+    public static final String KEY_EDIT_MAX_SELECTION = "edit.maxSelectionChars";
+    /** Записывать применения/отмены правок в журнал аудита. */
+    public static final String KEY_EDIT_AUDIT = "edit.audit";
+
     public static final int DEFAULT_MAX_ROWS = 200;
     public static final int DEFAULT_TIMEOUT_SEC = 60;
     public static final int DEFAULT_CELL_LENGTH = 2000;
@@ -100,6 +110,13 @@ public final class AisqlCore {
     public static final int MAX_MACRO_ID_LEN = 64;
     /** Сколько версий макроса хранить в истории. */
     public static final int MACRO_HISTORY_KEEP = 5;
+
+    /** Режим применения правки: предпросмотр, применение по кнопке. */
+    public static final String EDIT_MODE_PREVIEW = "preview";
+    /** Режим применения правки: применять сразу после генерации. */
+    public static final String EDIT_MODE_DIRECT = "direct";
+    public static final int DEFAULT_EDIT_MAX_SELECTION = 4000;
+    public static final int HARD_MAX_EDIT_SELECTION = 200000;
 
     private static final DateTimeFormatter MACRO_TS = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
@@ -218,6 +235,10 @@ public final class AisqlCore {
         p.setProperty(MaskingRules.KEY_ENABLED, "true");
         p.setProperty(MaskingRules.KEY_RULES, "");
         p.setProperty(KEY_MACROS_MAX_BYTES, String.valueOf(DEFAULT_MACROS_MAX_BYTES));
+        p.setProperty(KEY_EDIT_ENABLED, "true");
+        p.setProperty(KEY_EDIT_APPLY_MODE, EDIT_MODE_PREVIEW);
+        p.setProperty(KEY_EDIT_MAX_SELECTION, String.valueOf(DEFAULT_EDIT_MAX_SELECTION));
+        p.setProperty(KEY_EDIT_AUDIT, "true");
         return p;
     }
 
@@ -342,6 +363,33 @@ public final class AisqlCore {
         e.detail = detail == null ? "" : detail;
         e.error = error;
         e.rows = rows;
+        e.bytes = bytes;
+        e.durationMs = durationMs;
+        AisqlAudit.write(e);
+    }
+
+    /**
+     * Запись события аудита без контекста выполнения (например, правка
+     * выделения ИИ в редакторе). {@code connection} — имя подключения
+     * (допускается null, тогда «-»); sql/rows/category не заполняются.
+     */
+    public static void auditUi(
+        String function,
+        String connection,
+        String decision,
+        String detail,
+        String outcome,
+        long bytes,
+        long durationMs,
+        String error
+    ) {
+        AisqlAudit.Event e = new AisqlAudit.Event();
+        e.function = function;
+        e.decision = decision;
+        e.conn = connection == null || connection.isBlank() ? "-" : connection;
+        e.outcome = outcome == null ? "-" : outcome;
+        e.detail = detail == null ? "" : detail;
+        e.error = error;
         e.bytes = bytes;
         e.durationMs = durationMs;
         AisqlAudit.write(e);
