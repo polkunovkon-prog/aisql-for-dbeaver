@@ -8,7 +8,7 @@
  * нужны внешние средства).
  *
  * Пример записи:
- *   {"ts":"2026-10-16T12:00:00.123456Z","user":"pka","app":"1.0.0",
+ *   {"ts":"2026-10-16T12:00:00.123456Z","user":"demo","app":"1.0.0",
  *    "function":"db_executeSql","decision":"ask","conn":"sakila [PostgreSQL]",
  *    "category":"DML","outcome":"OK","rows":1,"bytes":-1,"ms":12,
  *    "detail":"выполнение после подтверждения","sql":"UPDATE ...",

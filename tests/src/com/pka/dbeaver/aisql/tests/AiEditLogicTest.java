@@ -22,10 +22,10 @@ public final class AiEditLogicTest {
         T.check(AiEditLogic.systemPrompt().contains("ТОЛЬКО"),
             "системный промпт требует вернуть только фрагмент");
 
-        String message = AiEditLogic.userMessage("сделай lowercase", "SELECT * FROM T", "hogwarts");
+        String message = AiEditLogic.userMessage("сделай lowercase", "SELECT * FROM T", "demo");
         T.check(message.contains("сделай lowercase"), "сообщение содержит инструкцию");
         T.check(message.contains("SELECT * FROM T"), "сообщение содержит фрагмент");
-        T.check(message.contains("hogwarts"), "сообщение содержит имя подключения");
+        T.check(message.contains("demo"), "сообщение содержит имя подключения");
 
         String chat = AiEditLogic.chatPrompt("добавь where", "SELECT 1", null);
         T.check(chat.contains("добавь where") && chat.contains("> SELECT 1"),
