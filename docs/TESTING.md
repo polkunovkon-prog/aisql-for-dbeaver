@@ -36,10 +36,10 @@
 ### 0. Предварительно
 
 - [ ] DBeaver запущен, есть активное подключение к тестовой БД;
-- [ ] Preferences → AI → «Инструменты ИИ»: в списке **11** функций
-      (`db_runQuery`, `db_executeSql`, `db_getContext`, `db_listObjects`,
-      `db_getObjectDdl`, `db_explain`, `db_help`, `db_listMacros`,
-      `db_runMacro`, `db_defineMacro`, `db_deleteMacro`);
+- [ ] Preferences → AI → «Инструменты ИИ»: в списке **12** функций
+      (`db_validateQuery`, `db_runQuery`, `db_executeSql`, `db_getContext`,
+      `db_listObjects`, `db_getObjectDdl`, `db_explain`, `db_help`,
+      `db_listMacros`, `db_runMacro`, `db_defineMacro`, `db_deleteMacro`);
 - [ ] Preferences → AI → «AI SQL: инструменты SQL» — страница открывается.
 
 ### 1. Чтение данных

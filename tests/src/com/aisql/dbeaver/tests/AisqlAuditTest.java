@@ -33,6 +33,9 @@ public final class AisqlAuditTest {
         AisqlCore.saveSettingsSafe(AisqlCore.defaultSettings());
         Path audit = AisqlAudit.file();
         cleanFiles(audit);
+        // Кэш последнего хеша мог остаться от предыдущих тестов, писавших
+        // в журнал; после очистки файла цепочка должна начинаться с genesis.
+        AisqlAudit.resetChainCache();
 
         for (int i = 1; i <= 3; i++) {
             AisqlAudit.Event event = new AisqlAudit.Event();

@@ -29,9 +29,16 @@ public final class AllTests {
 
         GlobsTest.run();
         SqlClassifierTest.run();
+        SqlAstValidatorTest.run();
+        SqlContractTest.run();
+        SqlTaskTest.run();
+        TableWhitelistTest.run();
+        PromptInjectionDefenseTest.run();
         MaskingRulesTest.run();
         ConnectionProfilesTest.run();
         QueryPolicyTest.run();
+        // Аудит — первым среди пишущих в журнал: он очищает файл и проверяет
+        // цепочку с genesis, а кэш последнего хеша пересчитывается по файлу.
         AisqlAuditTest.run();
         PromptBuilderTest.run();
         AiEditLogicTest.run();

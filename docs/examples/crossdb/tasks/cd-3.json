@@ -1,0 +1,18 @@
+{
+  "id": "cd-3",
+  "datasource": "cadia",
+  "task": "Структура подчинённости: для каждого подразделения (армия, корпус, дивизия, бригада, полк, батальон) — русское название уровня, код, название и число личного состава. Считать от факта personnel вниз по внешним ключам, без рекурсивных CTE.",
+  "grain": "одна строка = подразделение",
+  "entity": "personnel",
+  "placeholders": 0,
+  "expectRows": 13,
+  "columns": [
+    {"name": "unit_type_ru", "type": "string", "required": true},
+    {"name": "unit_code", "type": "string", "required": true},
+    {"name": "unit_name", "type": "string", "required": true},
+    {"name": "personnel_count", "type": "integer", "required": true},
+    {"name": "level_order", "type": "integer", "required": true}
+  ],
+  "checks": [],
+  "openQuestions": []
+}

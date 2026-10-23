@@ -13,4 +13,5 @@ Require-Bundle: org.eclipse.core.runtime,
  org.jkiss.dbeaver.model,
  org.jkiss.dbeaver.model.ai,
  org.jkiss.dbeaver.model.sql,
- org.jkiss.utils
+ org.jkiss.utils,
+ com.github.jsqlparser

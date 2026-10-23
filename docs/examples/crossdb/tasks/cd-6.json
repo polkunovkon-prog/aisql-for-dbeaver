@@ -1,0 +1,21 @@
+{
+  "id": "cd-6",
+  "datasource": "cadia",
+  "task": "Снабжение по позициям: код позиции, название, запрошено, поставлено, отклонено и процент выполнения заявки. Параметр — код полка, «%» означает все полки.",
+  "grain": "одна строка = позиция снабжения",
+  "entity": "supply_requests",
+  "placeholders": 2,
+  "expectRows": 11,
+  "columns": [
+    {"name": "item_code", "type": "string", "required": true},
+    {"name": "item_name", "type": "string", "required": true},
+    {"name": "requested_qty", "type": "integer", "required": true},
+    {"name": "delivered_qty", "type": "integer", "required": true},
+    {"name": "rejected_qty", "type": "integer", "required": true},
+    {"name": "fill_pct", "type": "decimal", "required": true}
+  ],
+  "checks": [
+    {"column": "requested_qty", "sum": 2094960}
+  ],
+  "openQuestions": []
+}

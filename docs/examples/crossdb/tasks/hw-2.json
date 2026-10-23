@@ -1,0 +1,26 @@
+{
+  "id": "hw-2",
+  "datasource": "hogwarts",
+  "task": "Студенты по факультетам: код факультета, название, всего студентов, активных, средний балл, доля «Отлично», доля завершивших обучение, участников клубов, выдач книг, ранг по среднему баллу и общий средний балл по всем факультетам. Параметр — код факультета, «%» означает все факультеты.",
+  "grain": "одна строка = факультет",
+  "entity": "students",
+  "placeholders": 2,
+  "expectRows": 4,
+  "columns": [
+    {"name": "house_code", "type": "string", "required": true},
+    {"name": "house_name", "type": "string", "required": true},
+    {"name": "students_total", "type": "integer", "required": true},
+    {"name": "students_active", "type": "integer", "required": true},
+    {"name": "avg_exam_score", "type": "decimal", "required": true},
+    {"name": "excellent_pct", "type": "decimal", "required": true},
+    {"name": "completed_pct", "type": "decimal", "required": true},
+    {"name": "club_members", "type": "integer", "required": true},
+    {"name": "library_loans", "type": "integer", "required": true},
+    {"name": "score_rank", "type": "integer", "required": true},
+    {"name": "overall_avg_score", "type": "decimal", "required": true}
+  ],
+  "checks": [
+    {"column": "students_total", "sum": 900}
+  ],
+  "openQuestions": []
+}

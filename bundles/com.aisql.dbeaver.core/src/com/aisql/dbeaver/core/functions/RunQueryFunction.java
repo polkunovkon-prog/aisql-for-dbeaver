@@ -14,7 +14,10 @@ package com.aisql.dbeaver.core.functions;
 
 import com.aisql.dbeaver.core.AisqlCore;
 import com.aisql.dbeaver.core.ConnectionProfiles;
+import com.aisql.dbeaver.core.PromptInjectionDefense;
+import com.aisql.dbeaver.core.SqlAstValidator;
 import com.aisql.dbeaver.core.SqlClassifier;
+import com.aisql.dbeaver.core.TableWhitelist;
 
 import org.jkiss.dbeaver.DBException;
 import org.jkiss.dbeaver.model.ai.AIFunction;
@@ -68,6 +71,22 @@ public class RunQueryFunction implements AIFunction {
             throw new DBException("Профиль READ_ONLY: EXPLAIN ANALYZE фактически ВЫПОЛНЯЕТ запрос, "
                 + "поэтому запрещён. Используйте обычный EXPLAIN (без ANALYZE).");
         }
+
+        // Белый список таблиц (policy.allowedTables) — проверка по дереву разбора,
+        // до выполнения. Пустой список = ограничения нет (поведение по умолчанию).
+        SqlAstValidator.Result ast = SqlAstValidator.validate(sql, -1);
+        if (ast.statement != null) {
+            java.util.List<String> wl = TableWhitelist.violations(
+                AisqlCore.connectionName(executionContext), ast.tables);
+            if (!wl.isEmpty()) {
+                AisqlCore.auditExec("runQuery", executionContext, sql, "deny",
+                    "whitelist", stmt.categoryName, "DENIED", -1, -1, -1, wl.get(0));
+                throw new DBException(String.join(" ", wl));
+            }
+        }
+
+        // Признаки инъекции в тексте задания/SQL — только пометка в аудите.
+        PromptInjectionDefense.auditIfSuspicious("runQuery", executionContext, sql, "sql");
 
         int maxRows = AisqlCore.maxRows(args);
         int timeout = AisqlCore.timeoutSec(args);

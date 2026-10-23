@@ -17,6 +17,22 @@
             description="Функции выполнения SQL-запросов и работы с объектами базы данных."/>
 
       <function
+            id="validateQuery"
+            name="Проверить SQL до выполнения"
+            enabledByDefault="true"
+            type="INFORMATION"
+            purpose="ALL"
+            system="true"
+            defaultAllowMode="ALWAYS_ALLOW"
+            class="com.aisql.dbeaver.core.functions.ValidateQueryFunction"
+            categoryId="ai.sql"
+            description="Структурная проверка SQL-запроса ДО выполнения на сервере: разбор дерева запроса, JOIN без условия ON/USING, смешение JOIN и перечисления таблиц через запятую, SELECT ... INTO, число заглушек «?», наличие обязательных выходных колонок (контракт). Ничего не выполняет в базе. ИСПОЛЬЗУЙ ЭТУ ФУНКЦИЮ после того как составил запрос и ПЕРЕД db_runQuery: если проверка не пройдена, исправь запрос по сообщению и вызови db_validateQuery снова. Это дешевле, чем ловить ошибку выполнением.">
+         <parameter name="sql" required="true" type="string" description="Текст SQL-запроса для проверки (один оператор)."/>
+         <parameter name="placeholders" required="false" type="integer" description="Сколько заглушек «?» должно быть в запросе (0 — ни одной). Если не указано, количество не проверяется."/>
+         <parameter name="columns" required="false" type="string" description="Контракт выходных колонок через запятую: «имя:тип», обязательная — с «!» на конце. Пример: house_code:string!, students_total:integer!. Типы: any, integer, bigint, decimal, numeric, float, string, text, boolean, date, timestamp, time."/>
+      </function>
+
+      <function
             id="runQuery"
             name="Выполнить SQL-запрос"
             enabledByDefault="true"

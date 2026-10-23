@@ -1,0 +1,26 @@
+{
+  "id": "hw-1",
+  "datasource": "hogwarts",
+  "task": "Ключевые показатели Хогвартса одной строкой: всего студентов, активных студентов, активных сотрудников, дисциплин, активных экзаменов, средний балл, доля оценок «Отлично», выдач книг, участников клубов.",
+  "grain": "одна строка — все показатели сразу (без группировки)",
+  "entity": "students",
+  "placeholders": 0,
+  "expectRows": 1,
+  "columns": [
+    {"name": "students_total", "type": "integer", "required": true},
+    {"name": "students_active", "type": "integer", "required": true},
+    {"name": "employees_total", "type": "integer", "required": true},
+    {"name": "subjects_total", "type": "integer", "required": true},
+    {"name": "exams_total", "type": "integer", "required": true},
+    {"name": "avg_exam_score", "type": "decimal", "required": true},
+    {"name": "excellent_pct", "type": "decimal", "required": true},
+    {"name": "library_loans", "type": "integer", "required": true},
+    {"name": "club_members", "type": "integer", "required": true}
+  ],
+  "checks": [
+    {"column": "students_total", "sum": 900},
+    {"column": "library_loans", "sum": 2000},
+    {"column": "club_members", "sum": 150}
+  ],
+  "openQuestions": []
+}

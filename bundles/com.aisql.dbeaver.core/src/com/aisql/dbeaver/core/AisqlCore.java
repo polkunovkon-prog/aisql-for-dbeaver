@@ -101,6 +101,8 @@ public final class AisqlCore {
     public static final String KEY_EDIT_MAX_SELECTION = "edit.maxSelectionChars";
     /** Записывать применения/отмены правок в журнал аудита. */
     public static final String KEY_EDIT_AUDIT = "edit.audit";
+    /** Помечать в аудите признаки инъекции в промпт (не блокирует выполнение). */
+    public static final String KEY_INJECTION_AUDIT = "audit.injectionDetection";
 
     public static final int DEFAULT_MAX_ROWS = 200;
     public static final int DEFAULT_TIMEOUT_SEC = 60;
@@ -246,6 +248,8 @@ public final class AisqlCore {
         p.setProperty(KEY_EDIT_PREVIEW_MODE, EDIT_PREVIEW_DIFF);
         p.setProperty(KEY_EDIT_MAX_SELECTION, String.valueOf(DEFAULT_EDIT_MAX_SELECTION));
         p.setProperty(KEY_EDIT_AUDIT, "true");
+        p.setProperty(KEY_INJECTION_AUDIT, "true");
+        p.setProperty(TableWhitelist.KEY_PREFIX + "*", "");
         return p;
     }
 

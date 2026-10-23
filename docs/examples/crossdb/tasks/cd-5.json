@@ -1,0 +1,16 @@
+{
+  "id": "cd-5",
+  "datasource": "cadia",
+  "task": "Приказы по годам и типам: год, русское название типа приказа, количество. Все сочетания год × тип должны присутствовать, даже если приказов этого типа в году не было (тогда 0). Типы: Боевые, Дисциплинарные, Кадровые, Снабжение, Переводы. Параметр — код полка, «%» означает все полки.",
+  "grain": "одна строка = год × тип приказа",
+  "entity": "orders",
+  "placeholders": 2,
+  "expectRows": 60,
+  "columns": [
+    {"name": "year_label", "type": "string", "required": true},
+    {"name": "order_type_ru", "type": "string", "required": true},
+    {"name": "cnt", "type": "integer", "required": true}
+  ],
+  "checks": [],
+  "openQuestions": []
+}

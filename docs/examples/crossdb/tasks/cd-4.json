@@ -1,0 +1,19 @@
+{
+  "id": "cd-4",
+  "datasource": "cadia",
+  "task": "Техника по типам и состоянию: русское название типа техники, русское название состояния, количество и доля состояния внутри типа в процентах.",
+  "grain": "одна строка = тип техники × состояние",
+  "entity": "equipment",
+  "placeholders": 0,
+  "expectRows": 15,
+  "columns": [
+    {"name": "equipment_type_ru", "type": "string", "required": true},
+    {"name": "status_ru", "type": "string", "required": true},
+    {"name": "cnt", "type": "integer", "required": true},
+    {"name": "share_in_type_pct", "type": "decimal", "required": true}
+  ],
+  "checks": [
+    {"column": "cnt", "sum": 2400}
+  ],
+  "openQuestions": []
+}

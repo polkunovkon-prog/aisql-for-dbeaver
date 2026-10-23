@@ -56,6 +56,16 @@ public final class AisqlAudit {
 
     private static final Object LOCK = new Object();
     private static String lastHash;
+    /** Файл, к которому относится {@link #lastHash}: после ротации/очистки хеш пересчитывается. */
+    private static Path lastHashFile;
+
+    /** Сбрасывает кэш последнего хеша (для тестов и после очистки журнала). */
+    public static void resetChainCache() {
+        synchronized (LOCK) {
+            lastHash = null;
+            lastHashFile = null;
+        }
+    }
 
     private AisqlAudit() {
     }
@@ -95,7 +105,16 @@ public final class AisqlAudit {
             Path f = file();
             synchronized (LOCK) {
                 rotateIfNeeded(f, maxBytes, maxFiles);
-                String prev = lastHash != null ? lastHash : (lastHash = loadLastHash(f, maxFiles));
+                String prev;
+                // Хеш переиспользуется только для того же файла: если журнал
+                // удалили, повернули или файл сменился, цепочка пересчитывается
+                // заново (иначе новая первая запись ссылалась бы на старый хвост).
+                if (lastHash != null && f.equals(lastHashFile)) {
+                    prev = lastHash;
+                } else {
+                    lastHashFile = f;
+                    prev = lastHash = loadLastHash(f, maxFiles);
+                }
                 String content = buildJson(e, prev, redact);
                 String hash = sha256(prev + "\n" + content);
                 String line = content.substring(0, content.length() - 1)

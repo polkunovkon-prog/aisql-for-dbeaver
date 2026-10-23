@@ -1,0 +1,23 @@
+{
+  "id": "cd-2",
+  "datasource": "cadia",
+  "task": "Категории личного состава: русское название категории, всего, активных, погибших, раненых, средняя выслуга лет, доля категории в процентах и порядок вывода категорий.",
+  "grain": "одна строка = категория ранга",
+  "entity": "personnel",
+  "placeholders": 0,
+  "expectRows": 5,
+  "columns": [
+    {"name": "rank_category_ru", "type": "string", "required": true},
+    {"name": "personnel_total", "type": "integer", "required": true},
+    {"name": "active_total", "type": "integer", "required": true},
+    {"name": "killed_total", "type": "integer", "required": true},
+    {"name": "wounded_total", "type": "integer", "required": true},
+    {"name": "avg_service_years", "type": "decimal", "required": true},
+    {"name": "share_pct", "type": "decimal", "required": true},
+    {"name": "category_order", "type": "integer", "required": true}
+  ],
+  "checks": [
+    {"column": "personnel_total", "sum": 12395}
+  ],
+  "openQuestions": []
+}
