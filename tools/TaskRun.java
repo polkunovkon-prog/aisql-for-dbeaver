@@ -77,6 +77,9 @@ public final class TaskRun {
         parseChecks(checksJson, contract);
 
         String executed = bind(sql, placeholders);
+        if (System.getenv("AISQL_DEBUG") != null) {
+            System.err.println("EXECUTED: " + executed);
+        }
         String url = "jdbc:postgresql://127.0.0.1:5432/" + db;
         String user = System.getenv().getOrDefault("PGUSER", "agent_user");
         String password = System.getenv().getOrDefault("PGPASSWORD", "");
@@ -193,7 +196,14 @@ public final class TaskRun {
         return d == null ? null : (int) Math.round(d);
     }
 
-    /** Подставляет '%' вместо всех «?» — эталонный режим «все значения». */
+    /**
+     * Прогон «все значения»: заглушки «?» подставляются в зависимости от типа
+     * параметра.
+     *   - numeric/bigint/decimal → выражение «IS NOT NULL» (любое число);
+     *   - string/text/any         → текстовая заглушка '%'.
+     *
+     * Это позволяет проверить и агрегаты (суммы), и фильтры по всем значениям.
+     */
     private static String bind(String sql, int count) {
         String out = sql;
         for (int i = 0; i < count; i++) {
@@ -201,9 +211,91 @@ public final class TaskRun {
             if (p < 0) {
                 break;
             }
-            out = out.substring(0, p) + "'%'" + out.substring(p + 1);
+            // `_?_` → `_` (обрезка `_`), не ломая операторы.
+            if (p > 0 && out.charAt(p - 1) == '_') {
+                out = out.substring(0, p) + out.substring(p + 1);
+                continue;
+            }
+            // Тип параметра: явное приведение сразу после «?» либо
+            // вид левого операнда сравнения («regiment_id = ?»).
+            final String cast = castAfter(out, p);
+            if (cast.contains("text") || cast.contains("varchar") || cast.contains("char")) {
+                // Строковый параметр: '%' — заглушка «все значения».
+                out = out.substring(0, p) + "'%'" + out.substring(p + 1);
+            } else if (isNumeric(cast) || leftIsNumeric(out, p)) {
+                // Числовой параметр: 0 как нейтральное значение для фильтра.
+                out = out.substring(0, p) + "0" + out.substring(p + 1);
+            } else {
+                // Приведения нет — параметр чаще строковый фильтр.
+                out = out.substring(0, p) + "'%'" + out.substring(p + 1);
+            }
         }
         return out;
+    }
+
+    private static final List<String> numericTypes = List.of(
+            "integer", "bigint", "decimal", "numeric", "float", "real", "double precision");
+
+    /** Приведение типа сразу после «?»: «::text», «::integer» … (нижний регистр). */
+    private static String castAfter(String sql, int p) {
+        int i = p + 1;
+        while (i < sql.length() && Character.isWhitespace(sql.charAt(i))) {
+            i++;
+        }
+        if (i + 1 >= sql.length() || sql.charAt(i) != ':' || sql.charAt(i + 1) != ':') {
+            return "";
+        }
+        i += 2;
+        while (i < sql.length() && Character.isWhitespace(sql.charAt(i))) {
+            i++;
+        }
+        int start = i;
+        while (i < sql.length() && (Character.isLetterOrDigit(sql.charAt(i)) || sql.charAt(i) == '_')) {
+            i++;
+        }
+        return sql.substring(start, i).toLowerCase(Locale.ROOT);
+    }
+
+    /** Числовые колонки, известные по имени (суффикс _id, счётчики). */
+    private static boolean leftIsNumeric(String sql, int p) {
+        int i = p - 1;
+        while (i >= 0 && Character.isWhitespace(sql.charAt(i))) {
+            i--;
+        }
+        if (i < 0 || sql.charAt(i) != '=' && sql.charAt(i) != '<' && sql.charAt(i) != '>') {
+            return false;
+        }
+        i--;
+        while (i >= 0 && Character.isWhitespace(sql.charAt(i))) {
+            i--;
+        }
+        int end = i + 1;
+        while (i >= 0 && (Character.isLetterOrDigit(sql.charAt(i)) || sql.charAt(i) == '_')) {
+            i--;
+        }
+        String col = sql.substring(i + 1, end).toLowerCase(Locale.ROOT);
+        if (col.isEmpty()) {
+            return false;
+        }
+        if (col.endsWith("_id") || col.endsWith("_qty") || col.endsWith("_count")
+                || col.equals("id") || col.equals("year") || col.equals("grade")
+                || col.endsWith("_year") || col.endsWith("_num") || col.endsWith("_no")) {
+            return true;
+        }
+        return false;
+    }
+
+    /** Является ли приведение числовым типом. */
+    private static boolean isNumeric(String cast) {
+        if (cast.isEmpty()) {
+            return false;
+        }
+        for (String t : numericTypes) {
+            if (cast.contains(t)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static int findPlaceholder(String sql) {

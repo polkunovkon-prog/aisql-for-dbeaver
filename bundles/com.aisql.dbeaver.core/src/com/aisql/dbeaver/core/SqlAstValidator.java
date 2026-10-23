@@ -123,6 +123,8 @@ public final class SqlAstValidator {
             return r;
         }
         String text = sql.trim();
+        // JSqlParser не парсит оператор «не равно» <>, конвертируем в !=.
+        text = normalizeNotEqual(text);
 
         Statement stmt;
         try {
@@ -370,6 +372,46 @@ public final class SqlAstValidator {
             }
         }
         return t;
+    }
+
+    /**
+     * JSqlParser не понимает SQL-совместимый «не равно» &lt;&gt; — переписываем в !=
+     * только вне строк/комментариев, чтобы парсер принял запрос.
+     */
+    private static String normalizeNotEqual(String sql) {
+        boolean inString = false;
+        boolean inDq = false;
+        boolean inLineComment = false;
+        boolean inBlockComment = false;
+        for (int i = 0; i < sql.length() - 1; i++) {
+            char c = sql.charAt(i);
+            char n = sql.charAt(i + 1);
+            if (inBlockComment) {
+                if (c == '*' && n == '/') { inBlockComment = false; }
+                continue;
+            }
+            if (inLineComment) {
+                continue;
+            }
+            if (inDq) {
+                if (c == '"') { inDq = false; }
+                continue;
+            }
+            if (inString) {
+                if (c == '\'') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (c == '-' && n == '-') { inLineComment = true; continue; }
+            if (c == '/' && n == '*') { inBlockComment = true; continue; }
+            if (c == '\'') { inString = true; continue; }
+            if (c == '"') { inDq = true; continue; }
+            if (c == '<' && n == '>') {
+                return sql.substring(0, i) + "!=" + sql.substring(i + 2);
+            }
+        }
+        return sql;
     }
 
     /** Число заглушек {@code ?} вне литералов и комментариев. */
