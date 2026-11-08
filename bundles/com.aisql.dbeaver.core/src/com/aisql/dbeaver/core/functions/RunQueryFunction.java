@@ -26,6 +26,7 @@ import org.jkiss.dbeaver.model.ai.AIFunctionResult;
 import org.jkiss.dbeaver.model.exec.DBCExecutionContext;
 import org.jkiss.dbeaver.model.runtime.DBRProgressMonitor;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -39,6 +40,7 @@ public class RunQueryFunction implements AIFunction {
     @Override
     public AIFunctionResult callFunction(AIFunctionContext context, Map<String, Object> args) throws DBException {
         DBCExecutionContext executionContext = AisqlCore.execContext(context);
+        AisqlCore.guardToolEnabled("runQuery", executionContext);
 
         String sql = AisqlCore.str(args, "sql");
         if (sql == null) {
@@ -85,8 +87,10 @@ public class RunQueryFunction implements AIFunction {
             }
         }
 
-        // Признаки инъекции в тексте задания/SQL — только пометка в аудите.
+        // Признаки инъекции в тексте задания/SQL — пометка в аудите,
+        // а в режиме strict — блокировка попыток угона модели.
         PromptInjectionDefense.auditIfSuspicious("runQuery", executionContext, sql, "sql");
+        PromptInjectionDefense.checkStrict("runQuery", executionContext, sql, "sql");
 
         int maxRows = AisqlCore.maxRows(args);
         int timeout = AisqlCore.timeoutSec(args);

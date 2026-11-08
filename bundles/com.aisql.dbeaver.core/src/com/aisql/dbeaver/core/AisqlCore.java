@@ -103,6 +103,23 @@ public final class AisqlCore {
     public static final String KEY_EDIT_AUDIT = "edit.audit";
     /** Помечать в аудите признаки инъекции в промпт (не блокирует выполнение). */
     public static final String KEY_INJECTION_AUDIT = "audit.injectionDetection";
+    /** Режим защиты от инъекций: off | flag | strict (см. PromptInjectionDefense). */
+    public static final String KEY_INJECTION_MODE = "injection.mode";
+    /** Оборачивать данные из БД (DDL и пр.) в защитные блоки «данные, не инструкции». */
+    public static final String KEY_TOOL_OUTPUT_FENCE = "toolOutput.fence";
+    /** Эвристическая детекция ПДн в значениях ячеек (см. PiiDetector). */
+    public static final String KEY_DETECT_PII = "mask.detectPII";
+    /** Замена для значений, распознанных как ПДн. */
+    public static final String KEY_PII_REPLACEMENT = "mask.piiReplacement";
+    /** Сколько строк по умолчанию возвращает db_getTableSample. */
+    public static final String KEY_SAMPLE_MAX_ROWS = "sample.maxRows";
+
+    /** Режим инъекций: детекция выключена. */
+    public static final String INJECTION_MODE_OFF = "off";
+    /** Режим инъекций: помечать в аудите, не блокировать. */
+    public static final String INJECTION_MODE_FLAG = "flag";
+    /** Режим инъекций: блокировать SQL с признаками угона модели. */
+    public static final String INJECTION_MODE_STRICT = "strict";
 
     public static final int DEFAULT_MAX_ROWS = 200;
     public static final int DEFAULT_TIMEOUT_SEC = 60;
@@ -125,6 +142,10 @@ public final class AisqlCore {
     public static final String EDIT_PREVIEW_FULL = "full";
     public static final int DEFAULT_EDIT_MAX_SELECTION = 4000;
     public static final int HARD_MAX_EDIT_SELECTION = 200000;
+    public static final String DEFAULT_PII_REPLACEMENT = "[ПДн]";
+    public static final int DEFAULT_SAMPLE_ROWS = 5;
+    /** Жёсткий потолок строк для db_getTableSample (минимизация данных). */
+    public static final int HARD_MAX_SAMPLE_ROWS = 50;
 
     private static final DateTimeFormatter MACRO_TS = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
@@ -164,9 +185,10 @@ public final class AisqlCore {
     private static volatile long settingsSize = -1;
 
     /**
-     * Настройки плагина. Файл перечитывается только при изменении
-     * (mtime + размер), поэтому правки в файле подхватываются без
-     * перезапуска DBeaver. Возвращается копия — менять её безопасно.
+     * Эффективные настройки плагина: пользовательские + корпоративная политика
+     * поверх (значения политики выигрывают, см. EnterprisePolicy). Файл
+     * перечитывается только при изменении (mtime + размер). Возвращается
+     * копия — менять её безопасно.
      */
     public static Properties loadSettings() {
         synchronized (SETTINGS_LOCK) {
@@ -191,6 +213,21 @@ public final class AisqlCore {
             } catch (Exception e) {
                 log.debug("Не удалось прочитать настройки плагина SQL-ИИ", e);
             }
+            Properties copy = new Properties();
+            if (settingsCache != null) {
+                copy.putAll(settingsCache);
+            }
+            return EnterprisePolicy.overlay(copy);
+        }
+    }
+
+    /**
+     * Пользовательские настройки без наложения корпоративной политики —
+     * для записи (чтобы значения политики не «прилипали» к пользовательскому
+     * файлу при сохранении).
+     */
+    public static Properties userSettings() {
+        synchronized (SETTINGS_LOCK) {
             Properties copy = new Properties();
             if (settingsCache != null) {
                 copy.putAll(settingsCache);
@@ -249,6 +286,14 @@ public final class AisqlCore {
         p.setProperty(KEY_EDIT_MAX_SELECTION, String.valueOf(DEFAULT_EDIT_MAX_SELECTION));
         p.setProperty(KEY_EDIT_AUDIT, "true");
         p.setProperty(KEY_INJECTION_AUDIT, "true");
+        // KEY_INJECTION_MODE намеренно не задаётся в значениях по умолчанию:
+        // пока пользователь не сохранил настройки со страницей 1.5.0+, действует
+        // совместимость со старым ключом audit.injectionDetection.
+        p.setProperty(KEY_TOOL_OUTPUT_FENCE, "true");
+        p.setProperty(KEY_DETECT_PII, "true");
+        p.setProperty(KEY_PII_REPLACEMENT, DEFAULT_PII_REPLACEMENT);
+        p.setProperty(KEY_SAMPLE_MAX_ROWS, String.valueOf(DEFAULT_SAMPLE_ROWS));
+        p.setProperty(AuditSyslog.KEY_ENABLED, "false");
         p.setProperty(TableWhitelist.KEY_PREFIX + "*", "");
         return p;
     }
@@ -275,6 +320,7 @@ public final class AisqlCore {
                 settingsCache.putAll(p);
                 settingsMtime = Files.getLastModifiedTime(f).toMillis();
                 settingsSize = Files.size(f);
+                restrictPermissions(f);
             } catch (Exception e) {
                 throw new DBException("Не удалось сохранить настройки плагина: " + e.getMessage(), e);
             }
@@ -283,7 +329,7 @@ public final class AisqlCore {
 
     /** Сохранить одно значение, не теряя остальные настройки. */
     public static void setSetting(String key, String value) throws DBException {
-        Properties p = loadSettings();
+        Properties p = userSettings();
         if (value == null) {
             p.remove(key);
         } else {
@@ -327,6 +373,51 @@ public final class AisqlCore {
             return Integer.parseInt(v.trim());
         } catch (NumberFormatException e) {
             return def;
+        }
+    }
+
+    /**
+     * Права на файл настроек/журнала: только владелец (0600, POSIX).
+     * На файловых системах без POSIX-прав вызов тихо пропускается.
+     */
+    static void restrictPermissions(Path f) {
+        try {
+            if (Files.exists(f)
+                && f.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+                Files.setPosixFilePermissions(f, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+            }
+        } catch (Exception e) {
+            log.debug("Не удалось ограничить права на файл " + f, e);
+        }
+    }
+
+    // ======================================================================
+    //  Корпоративная политика
+    // ======================================================================
+
+    /**
+     * Контроль доступа к инструменту на входе каждой AI-функции:
+     * fail-closed проверка корпоративной политики и списка tools.disabled.
+     * При отказе пишет событие в аудит и бросает понятное исключение.
+     */
+    public static void guardToolEnabled(String functionId, DBCExecutionContext ctx) throws DBException {
+        if (EnterprisePolicy.isBroken()) {
+            AisqlAudit.Event e = new AisqlAudit.Event();
+            e.function = functionId;
+            e.decision = "deny";
+            e.outcome = "DENIED";
+            e.detail = "enterprise policy: fail-closed (политика задана, но не читается)";
+            AisqlAudit.write(e);
+            throw new DBException("Корпоративная политика AI SQL задана (системное свойство "
+                + EnterprisePolicy.POLICY_FILE_PROPERTY + "), но файл политики не читается. "
+                + "Выполнение инструментов заблокировано (fail-closed). Обратитесь к администратору.");
+        }
+        if (EnterprisePolicy.isToolDisabled(functionId)) {
+            AisqlCore.audit(functionId, ctx, null, "deny",
+                "enterprise policy: инструмент отключён (" + EnterprisePolicy.KEY_TOOLS_DISABLED + ")");
+            throw new DBException("Инструмент db_" + functionId
+                + " отключён корпоративной политикой (" + EnterprisePolicy.KEY_TOOLS_DISABLED
+                + "). Обратитесь к администратору.");
         }
     }
 
@@ -581,7 +672,7 @@ public final class AisqlCore {
                     hasResultSet = statement.executeStatement();
                 } catch (Exception e) {
                     res.error = e;
-                    res.text = "Ошибка выполнения: " + e.getMessage();
+                    res.text = describeError(e);
                     return res;
                 }
                 long duration = System.currentTimeMillis() - start;
@@ -609,9 +700,20 @@ public final class AisqlCore {
             }
         } catch (Exception e) {
             res.error = e;
-            res.text = "Ошибка выполнения: " + e.getMessage();
+            res.text = describeError(e);
             return res;
         }
+    }
+
+    /**
+     * Текст ошибки + подсказка для модели (корректирующий цикл:
+     * типовые ошибки СУБД сопровождаются указанием, что делать дальше).
+     */
+    public static String describeError(Throwable e) {
+        String message = e == null ? "неизвестная ошибка" : String.valueOf(e.getMessage());
+        String hint = SqlErrorHints.hintFor(message);
+        return "Ошибка выполнения: " + message
+            + (hint == null ? "" : "\nПодсказка: " + hint);
     }
 
     /** Усечение текста результата до limit.maxPayloadChars (<=0 — без ограничения). */
@@ -653,6 +755,14 @@ public final class AisqlCore {
                     attr.getEntityName(), attr.getName(), attr.getLabel());
             }
         }
+        // Эвристическая детекция ПДн по значению — работает независимо от имён колонок
+        // (защита при SELECT * и вычислимых колонках), в тех же профилях, что и правила.
+        boolean detectPii = masks != null && AisqlCore.getBool(KEY_DETECT_PII, true);
+        String piiReplacement = null;
+        if (detectPii) {
+            String configured = AisqlCore.getSetting(KEY_PII_REPLACEMENT, DEFAULT_PII_REPLACEMENT);
+            piiReplacement = configured == null || configured.isBlank() ? DEFAULT_PII_REPLACEMENT : configured;
+        }
 
         StringBuilder header = new StringBuilder();
         for (int i = 0; i < columnCount; i++) {
@@ -691,7 +801,11 @@ public final class AisqlCore {
                 } catch (Exception e) {
                     value = "<ошибка: " + e.getMessage() + ">";
                 }
-                body.append(formatValue(value, maxCellLength));
+                String cell = formatValue(value, maxCellLength);
+                if (detectPii && cell.length() >= 7 && PiiDetector.isPii(cell)) {
+                    cell = piiReplacement;
+                }
+                body.append(cell);
             }
             rows++;
         }

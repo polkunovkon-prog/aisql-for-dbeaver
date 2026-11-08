@@ -16,6 +16,7 @@ package com.aisql.dbeaver.core.functions;
 
 import com.aisql.dbeaver.core.AisqlCore;
 import com.aisql.dbeaver.core.ConnectionProfiles;
+import com.aisql.dbeaver.core.PromptInjectionDefense;
 import com.aisql.dbeaver.core.QueryPolicy;
 import com.aisql.dbeaver.core.SqlClassifier;
 
@@ -39,6 +40,7 @@ public class RunMacroFunction implements AIFunction {
     @Override
     public AIFunctionResult callFunction(AIFunctionContext context, Map<String, Object> args) throws DBException {
         DBCExecutionContext ctx = AisqlCore.execContext(context);
+        AisqlCore.guardToolEnabled("runMacro", ctx);
         DBRProgressMonitor monitor = context.getMonitor();
 
         String name = AisqlCore.str(args, "name");
@@ -92,6 +94,10 @@ public class RunMacroFunction implements AIFunction {
                 null, "DENIED", -1, -1, -1, null);
             throw new DBException("Выполнение макроса '" + id + "' отклонено. " + decision.reason);
         }
+
+        // Инъекции в теле макроса: пометка, а в strict — блокировка угона модели.
+        PromptInjectionDefense.auditIfSuspicious("runMacro", ctx, sql, "macro " + id);
+        PromptInjectionDefense.checkStrict("runMacro", ctx, sql, "macro " + id);
 
         int maxRows = AisqlCore.maxRows(args);
         int timeout = AisqlCore.timeoutSec(args);

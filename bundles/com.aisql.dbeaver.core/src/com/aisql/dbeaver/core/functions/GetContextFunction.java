@@ -12,8 +12,11 @@
 package com.aisql.dbeaver.core.functions;
 
 import com.aisql.dbeaver.core.AisqlCore;
+import com.aisql.dbeaver.core.AuditSyslog;
 import com.aisql.dbeaver.core.ConnectionProfiles;
+import com.aisql.dbeaver.core.EnterprisePolicy;
 import com.aisql.dbeaver.core.MaskingRules;
+import com.aisql.dbeaver.core.PromptInjectionDefense;
 
 import org.jkiss.dbeaver.DBException;
 import org.jkiss.dbeaver.model.DBUtils;
@@ -36,6 +39,7 @@ public class GetContextFunction implements AIFunction {
     @Override
     public AIFunctionResult callFunction(AIFunctionContext context, Map<String, Object> args) throws DBException {
         DBCExecutionContext ctx = AisqlCore.execContext(context);
+        AisqlCore.guardToolEnabled("getContext", ctx);
 
         StringBuilder sb = new StringBuilder();
         sb.append("Текущее подключение к базе данных:\n");
@@ -109,9 +113,30 @@ public class GetContextFunction implements AIFunction {
             }
         } catch (Exception ignored) {
         }
+        sb.append("- Детекция ПДн в значениях (email/телефон/карта/ИНН/СНИЛС): ")
+            .append(AisqlCore.getBool(AisqlCore.KEY_DETECT_PII, true) ? "включена" : "выключена")
+            .append('\n');
+        sb.append("- Защита от промпт-инъекций: режим ")
+            .append(PromptInjectionDefense.mode())
+            .append(PromptInjectionDefense.fenceEnabled()
+                ? ", данные из БД помечаются как «данные, не инструкции»" : "")
+            .append('\n');
         sb.append("- Журнал аудита: ")
             .append(AisqlCore.getBool(AisqlCore.KEY_AUDIT_ENABLED, true) ? "включён" : "выключен")
+            .append(AuditSyslog.enabled()
+                ? "; события дублируются в syslog (" + AisqlCore.getSetting(AuditSyslog.KEY_HOST, "") + ":"
+                    + AisqlCore.getInt(AuditSyslog.KEY_PORT, AuditSyslog.DEFAULT_PORT) + ")"
+                : "")
             .append('\n');
+        sb.append("- Корпоративная политика: ");
+        if (EnterprisePolicy.isBroken()) {
+            sb.append("задана, но не читается — работа инструментов заблокирована (fail-closed)");
+        } else if (EnterprisePolicy.isActive()) {
+            sb.append("активна, зафиксировано ключей: ").append(EnterprisePolicy.lockedKeys().size());
+        } else {
+            sb.append("не задана");
+        }
+        sb.append('\n');
 
         AisqlCore.auditExec("getContext", ctx, null, "read", "status=OK",
             null, "OK", -1, -1, -1, null);

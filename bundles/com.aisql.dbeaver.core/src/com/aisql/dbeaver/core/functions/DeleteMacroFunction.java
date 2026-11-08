@@ -25,6 +25,7 @@ public class DeleteMacroFunction implements AIFunction {
 
     @Override
     public AIFunctionResult callFunction(AIFunctionContext context, Map<String, Object> args) throws DBException {
+        AisqlCore.guardToolEnabled("deleteMacro", null);
         String name = AisqlCore.str(args, "name");
         if (name == null) {
             throw new DBException("Параметр 'name' обязателен.");

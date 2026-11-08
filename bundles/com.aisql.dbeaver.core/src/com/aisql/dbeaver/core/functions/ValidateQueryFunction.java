@@ -34,6 +34,7 @@ public class ValidateQueryFunction implements AIFunction {
 
     @Override
     public AIFunctionResult callFunction(AIFunctionContext context, Map<String, Object> args) throws DBException {
+        AisqlCore.guardToolEnabled("validateQuery", null);
         String sql = AisqlCore.str(args, "sql");
         if (sql == null) {
             throw new DBException("Параметр 'sql' обязателен: передайте текст запроса для проверки.");

@@ -33,6 +33,7 @@ public class ExplainFunction implements AIFunction {
     @Override
     public AIFunctionResult callFunction(AIFunctionContext context, Map<String, Object> args) throws DBException {
         DBCExecutionContext ctx = AisqlCore.execContext(context);
+        AisqlCore.guardToolEnabled("explain", ctx);
         DBRProgressMonitor monitor = context.getMonitor();
 
         String sql = AisqlCore.str(args, "sql");

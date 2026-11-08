@@ -27,6 +27,7 @@ public class ListMacrosFunction implements AIFunction {
 
     @Override
     public AIFunctionResult callFunction(AIFunctionContext context, Map<String, Object> args) throws DBException {
+        AisqlCore.guardToolEnabled("listMacros", null);
         List<String> ids = AisqlCore.listMacroIds();
         StringBuilder sb = new StringBuilder();
         sb.append("Сохранённые макросы (").append(ids.size()).append("):\n");
@@ -45,6 +46,7 @@ public class ListMacrosFunction implements AIFunction {
                 sb.append('\n');
             }
         }
+        AisqlCore.audit("listMacros", null, null, "read", "count=" + ids.size());
         return AisqlCore.info(sb.toString());
     }
 }

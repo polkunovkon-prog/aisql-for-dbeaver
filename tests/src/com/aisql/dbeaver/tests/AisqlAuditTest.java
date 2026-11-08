@@ -63,6 +63,19 @@ public final class AisqlAuditTest {
         T.check(lines.get(1).contains("\\\"") && lines.get(1).contains("\\n"),
             "кавычки и перевод строки экранированы в JSON");
 
+        // --- Поля enterprise-формата: seq, host, session.
+        T.check(lines.get(0).contains("\"seq\":1"), "seq первой записи = 1");
+        T.check(lines.get(1).contains("\"seq\":2"), "seq второй записи = 2");
+        T.check(lines.get(2).contains("\"seq\":3"), "seq третьей записи = 3");
+        for (String line : lines) {
+            T.check(line.contains("\"host\":\"") && !line.contains("\"host\":\"\""),
+                "host заполнен: " + line.substring(0, Math.min(80, line.length())));
+            T.check(Pattern.compile("\"session\":\"[0-9a-f-]{8,64}\"").matcher(line).find(),
+                "session заполнен UUID");
+        }
+        // seq входит в хеш: цепочка валидна уже проверена выше — значит, поля
+        // не выбиваются из контрольной суммы.
+
         // Подмена содержимого должна ломать цепочку.
         List<String> broken = new ArrayList<>(lines);
         broken.set(1, broken.get(1).replace("\"rows\":2", "\"rows\":999"));
@@ -107,8 +120,78 @@ public final class AisqlAuditTest {
         T.eq(extract(HASH, rotatedTail), extract(PREV, firstLine),
             "цепочка продолжается после ротации (prev = хвост .1)");
 
+        // --- Syslog: отправка события в локальный UDP-приёмник.
+        testSyslogShipping(audit);
+
         cleanFiles(audit);
         AisqlCore.saveSettingsSafe(AisqlCore.defaultSettings());
+    }
+
+    /** Проверка отправки событий аудита в syslog (UDP, локальный приёмник). */
+    private static void testSyslogShipping(Path audit) throws Exception {
+        T.section("AisqlAudit → syslog (экспорт в SIEM)");
+
+        cleanFiles(audit);
+        AisqlAudit.resetChainCache();
+        // Сброс лимитов ротации (после предыдущего раздела теста): иначе
+        // события уходят в повёрнутые файлы и подсчёт строк ломается.
+        AisqlCore.setSettingSafe(AisqlAudit.KEY_MAX_BYTES,
+            String.valueOf(AisqlAudit.DEFAULT_MAX_BYTES));
+        AisqlCore.setSettingSafe(AisqlAudit.KEY_MAX_FILES,
+            String.valueOf(AisqlAudit.DEFAULT_MAX_FILES));
+
+        try (java.net.DatagramSocket receiver = new java.net.DatagramSocket(new java.net.InetSocketAddress("127.0.0.1", 0))) {
+            receiver.setSoTimeout(5000);
+            int port = receiver.getLocalPort();
+
+            AisqlCore.setSettingSafe(com.aisql.dbeaver.core.AuditSyslog.KEY_ENABLED, "true");
+            AisqlCore.setSettingSafe(com.aisql.dbeaver.core.AuditSyslog.KEY_HOST, "127.0.0.1");
+            AisqlCore.setSettingSafe(com.aisql.dbeaver.core.AuditSyslog.KEY_PORT, String.valueOf(port));
+            AisqlCore.setSettingSafe(com.aisql.dbeaver.core.AuditSyslog.KEY_FACILITY, "16");
+
+            // Обычное событие → severity 6 (informational): PRI = 16*8+6 = 134.
+            AisqlAudit.Event ok = new AisqlAudit.Event();
+            ok.function = "syslog_ok_test";
+            ok.decision = "read";
+            ok.outcome = "OK";
+            AisqlAudit.write(ok);
+
+            byte[] buf = new byte[65536];
+            java.net.DatagramPacket packet = new java.net.DatagramPacket(buf, buf.length);
+            receiver.receive(packet);
+            String message = new String(buf, 0, packet.getLength(), StandardCharsets.UTF_8);
+            T.check(message.startsWith("<134>"), "PRI=134 (local0, informational): " + message.substring(0, Math.min(40, message.length())));
+            T.check(message.contains(" aisql "), "имя приложения aisql");
+            T.check(message.contains("\"function\":\"syslog_ok_test\""), "JSON события в сообщении");
+            T.check(message.contains("\"hash\":\""), "хеш цепочки передан в SIEM");
+            T.check(!message.contains("\n"), "сообщение — одна строка (датаграмма)");
+
+            // Событие отказа → severity 4 (warning): PRI = 16*8+4 = 132.
+            AisqlAudit.Event denied = new AisqlAudit.Event();
+            denied.function = "syslog_deny_test";
+            denied.decision = "deny";
+            denied.outcome = "DENIED";
+            AisqlAudit.write(denied);
+
+            receiver.receive(packet);
+            String warning = new String(buf, 0, packet.getLength(), StandardCharsets.UTF_8);
+            T.check(warning.startsWith("<132>"), "отказ → PRI=132 (warning)");
+            T.check(warning.contains("\"outcome\":\"DENIED\""), "отказ передан в SIEM");
+        } finally {
+            AisqlCore.setSettingSafe(com.aisql.dbeaver.core.AuditSyslog.KEY_ENABLED, "false");
+            AisqlCore.setSettingSafe(com.aisql.dbeaver.core.AuditSyslog.KEY_HOST, "");
+        }
+
+        // При выключенном syslog отправки нет — и это не ломает запись в файл.
+        int linesBefore;
+        Path file = AisqlAudit.file();
+        linesBefore = Files.readAllLines(file, StandardCharsets.UTF_8).size();
+        AisqlAudit.Event quiet = new AisqlAudit.Event();
+        quiet.function = "quiet_test";
+        quiet.outcome = "OK";
+        AisqlAudit.write(quiet);
+        T.eq(linesBefore + 1, Files.readAllLines(file, StandardCharsets.UTF_8).size(),
+            "запись в файл продолжается при выключенном syslog");
     }
 
     private static void cleanFiles(Path audit) throws Exception {

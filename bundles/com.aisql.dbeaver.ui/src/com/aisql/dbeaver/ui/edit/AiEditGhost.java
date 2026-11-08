@@ -60,7 +60,7 @@ final class AiEditGhost {
 
     /** Полная очистка: снять подсказку, слушателей и освободить цвета. */
     void dispose() {
-        UIUtils.runInUIThread(() -> {
+        UIUtils.asyncExec(() -> {
             painter.disable(true);
             painter.dispose();
         });

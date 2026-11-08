@@ -12,6 +12,7 @@
 package com.aisql.dbeaver.core.functions;
 
 import com.aisql.dbeaver.core.AisqlCore;
+import com.aisql.dbeaver.core.PromptInjectionDefense;
 
 import org.jkiss.dbeaver.DBException;
 import org.jkiss.dbeaver.model.DBPDataSource;
@@ -39,6 +40,7 @@ public class GetObjectDdlFunction implements AIFunction {
     @Override
     public AIFunctionResult callFunction(AIFunctionContext context, Map<String, Object> args) throws DBException {
         DBCExecutionContext ctx = AisqlCore.execContext(context);
+        AisqlCore.guardToolEnabled("getObjectDdl", ctx);
         DBRProgressMonitor monitor = context.getMonitor();
         DBPDataSource dataSource = ctx.getDataSource();
 
@@ -109,8 +111,14 @@ public class GetObjectDdlFunction implements AIFunction {
         sb.append("Тип: ").append(object.getClass().getSimpleName()).append('\n');
         sb.append("---\n");
         if (ddl != null && !ddl.trim().isEmpty()) {
-            sb.append(ddl);
-            if (!ddl.endsWith("\n")) {
+            // DDL — это данные из БД: комментарии в коде функций и телах объектов
+            // могут содержать непрямые промпт-инъекции. Защитный блок помечает
+            // содержимое как данные и подсвечивает попытки угона (fence, LLM01).
+            String fenced = PromptInjectionDefense.fenceEnabled()
+                ? PromptInjectionDefense.fence("DDL объекта " + fullName, ddl)
+                : ddl;
+            sb.append(fenced);
+            if (!fenced.endsWith("\n")) {
                 sb.append('\n');
             }
         } else {

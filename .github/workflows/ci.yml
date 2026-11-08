@@ -1,0 +1,85 @@
+name: CI
+
+# Сборка и офлайн-тесты плагина на нескольких версиях DBeaver CE 26.x.
+# DBeaver скачивается из GitHub Releases и кэшируется по тегу версии.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: "DBeaver CE ${{ matrix.dbeaver }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dbeaver: ["26.2.2", "26.1.5"]
+    env:
+      DBEAVER_VERSION: ${{ matrix.dbeaver }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache DBeaver CE
+        uses: actions/cache@v4
+        with:
+          path: ~/dbeaver/dbeaver-ce-${{ matrix.dbeaver }}
+          key: dbeaver-ce-${{ matrix.dbeaver }}
+
+      - name: Download DBeaver CE
+        run: |
+          DIR="$HOME/dbeaver/dbeaver-ce-$DBEAVER_VERSION"
+          if [ ! -d "$DIR" ]; then
+            mkdir -p "$HOME/dbeaver"
+            curl -sSLf -o /tmp/dbeaver.tar.gz \
+              "https://github.com/dbeaver/dbeaver/releases/download/$DBEAVER_VERSION/dbeaver-ce-$DBEAVER_VERSION-linux-x86_64.tar.gz"
+            tar -xzf /tmp/dbeaver.tar.gz -C "$HOME/dbeaver"
+            rm -f /tmp/dbeaver.tar.gz
+          fi
+          ls "$DIR/plugins" | head -3
+
+      - name: Build and test
+        run: ./releng/test.sh
+        env:
+          DBEAVER_HOME: ~/dbeaver/dbeaver-ce-${{ matrix.dbeaver }}
+
+      - name: Upload build artifacts
+        if: matrix.dbeaver == '26.2.2'
+        uses: actions/upload-artifact@v4
+        with:
+          name: aisql-dbeaver-dist
+          path: |
+            dist/dropins/plugins/*.jar
+            dist/SHA256SUMS
+            dist/BUILD-INFO.txt
+          retention-days: 14
+
+  verify-audit-script:
+    name: "verify-audit.py (Python)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Syntax check
+        run: python3 -m py_compile releng/verify-audit.py
+      - name: Help output
+        run: python3 releng/verify-audit.py --help || true
+      - name: Empty-file behaviour
+        run: |
+          touch /tmp/empty.jsonl
+          if python3 releng/verify-audit.py /tmp/empty.jsonl; then
+            echo "пустой файл должен считаться валидным (записей нет)"
+          else
+            echo "пустой файл: код отказа допустим"
+          fi

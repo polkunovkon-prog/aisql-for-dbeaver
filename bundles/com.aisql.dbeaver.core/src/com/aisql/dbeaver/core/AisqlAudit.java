@@ -31,6 +31,7 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -58,12 +59,19 @@ public final class AisqlAudit {
     private static String lastHash;
     /** Файл, к которому относится {@link #lastHash}: после ротации/очистки хеш пересчитывается. */
     private static Path lastHashFile;
+    /** Порядковый номер записи в текущем файле (для обнаружения удалений). */
+    private static long seq;
+    /** Имя хоста — вычисляется лениво один раз. */
+    private static String hostName;
+    /** Идентификатор сессии DBeaver (постоянный файл .config/ai-sql-session.id). */
+    private static volatile String sessionId;
 
     /** Сбрасывает кэш последнего хеша (для тестов и после очистки журнала). */
     public static void resetChainCache() {
         synchronized (LOCK) {
             lastHash = null;
             lastHashFile = null;
+            seq = 0;
         }
     }
 
@@ -114,6 +122,7 @@ public final class AisqlAudit {
                 } else {
                     lastHashFile = f;
                     prev = lastHash = loadLastHash(f, maxFiles);
+                    seq = countLines(f);
                 }
                 String content = buildJson(e, prev, redact);
                 String hash = sha256(prev + "\n" + content);
@@ -121,7 +130,14 @@ public final class AisqlAudit {
                     + ",\"hash\":\"" + hash + "\"}\n";
                 Files.writeString(f, line, StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                AisqlCore.restrictPermissions(f);
                 lastHash = hash;
+                seq++;
+                // Внешняя копия события для SIEM (UDP syslog, fire-and-forget):
+                // вынос журнала за пределы хоста закрывает главный разрыв
+                // локальной цепочки хешей (NIST SP 800-92).
+                AuditSyslog.ship(line.trim(),
+                    "DENIED".equalsIgnoreCase(e.outcome) || "ERROR".equalsIgnoreCase(e.outcome));
             }
         } catch (Exception ex) {
             AisqlCorePlugin.log().debug("Не удалось записать журнал аудита", ex);
@@ -220,10 +236,13 @@ public final class AisqlAudit {
     }
 
     private static String buildJson(Event e, String prev, boolean redact) {
-        StringBuilder sb = new StringBuilder(320);
+        StringBuilder sb = new StringBuilder(384);
         sb.append('{');
         appendString(sb, "ts", Instant.now().toString(), true);
         appendString(sb, "user", System.getProperty("user.name", "?"), false);
+        appendString(sb, "host", host(), false);
+        appendString(sb, "session", session(), false);
+        sb.append(",\"seq\":").append(seq + 1);
         appendString(sb, "app", AisqlCorePlugin.version(), false);
         appendString(sb, "function", nz(e.function), false);
         appendString(sb, "decision", nz(e.decision), false);
@@ -328,5 +347,59 @@ public final class AisqlAudit {
 
     private static String nz(String s) {
         return s == null || s.isEmpty() ? "-" : s;
+    }
+
+    /** Имя хоста (кэшируется; сбой — «unknown»). */
+    static String host() {
+        if (hostName != null) {
+            return hostName;
+        }
+        try {
+            hostName = java.net.InetAddress.getLocalHost().getHostName();
+        } catch (Exception e) {
+            hostName = "unknown";
+        }
+        return hostName;
+    }
+
+    /** Идентификатор сессии DBeaver: постоянный UUID в .config/ai-sql-session.id. */
+    static String session() {
+        String s = sessionId;
+        if (s != null) {
+            return s;
+        }
+        synchronized (LOCK) {
+            if (sessionId != null) {
+                return sessionId;
+            }
+            try {
+                Path f = AisqlCore.configDir().resolve("ai-sql-session.id");
+                if (Files.exists(f)) {
+                    String v = Files.readString(f, StandardCharsets.UTF_8).trim();
+                    if (v.matches("[0-9a-fA-F-]{8,64}")) {
+                        sessionId = v;
+                        return v;
+                    }
+                }
+                String v = UUID.randomUUID().toString();
+                Files.writeString(f, v, StandardCharsets.UTF_8);
+                AisqlCore.restrictPermissions(f);
+                sessionId = v;
+                return v;
+            } catch (Exception e) {
+                sessionId = "-";
+                return sessionId;
+            }
+        }
+    }
+
+    /** Число непустых строк файла (для инициализации seq). */
+    private static long countLines(Path f) {
+        try {
+            return Files.readAllLines(f, StandardCharsets.UTF_8).stream()
+                .filter(l -> !l.isEmpty()).count();
+        } catch (Exception e) {
+            return 0;
+        }
     }
 }

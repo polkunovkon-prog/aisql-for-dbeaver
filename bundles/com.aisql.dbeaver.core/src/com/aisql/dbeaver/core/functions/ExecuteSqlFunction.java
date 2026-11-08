@@ -20,6 +20,7 @@ package com.aisql.dbeaver.core.functions;
 
 import com.aisql.dbeaver.core.AisqlCore;
 import com.aisql.dbeaver.core.ConnectionProfiles;
+import com.aisql.dbeaver.core.PromptInjectionDefense;
 import com.aisql.dbeaver.core.QueryPolicy;
 import com.aisql.dbeaver.core.SqlClassifier;
 
@@ -41,6 +42,7 @@ public class ExecuteSqlFunction implements AIFunction {
     @Override
     public AIFunctionResult callFunction(AIFunctionContext context, Map<String, Object> args) throws DBException {
         DBCExecutionContext executionContext = AisqlCore.execContext(context);
+        AisqlCore.guardToolEnabled("executeSql", executionContext);
 
         String sql = AisqlCore.str(args, "sql");
         if (sql == null) {
@@ -69,6 +71,10 @@ public class ExecuteSqlFunction implements AIFunction {
                 null, "DENIED", -1, -1, -1, null);
             throw new DBException("Выполнение отклонено. " + decision.reason);
         }
+
+        // Признаки инъекции: пометка в аудите, в strict — блокировка угона модели.
+        PromptInjectionDefense.auditIfSuspicious("executeSql", executionContext, sql, "sql");
+        PromptInjectionDefense.checkStrict("executeSql", executionContext, sql, "sql");
 
         // Транзакционная защита: автокоммит отключается для любых изменяющих
         // операторов (DML/DDL/прочее), а не только по списку ключевых слов.

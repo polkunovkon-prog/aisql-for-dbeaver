@@ -45,6 +45,7 @@ public class ListObjectsFunction implements AIFunction {
     @Override
     public AIFunctionResult callFunction(AIFunctionContext context, Map<String, Object> args) throws DBException {
         DBCExecutionContext ctx = AisqlCore.execContext(context);
+        AisqlCore.guardToolEnabled("listObjects", ctx);
         DBRProgressMonitor monitor = context.getMonitor();
         DBPDataSource dataSource = ctx.getDataSource();
         if (!(dataSource instanceof DBSObjectContainer root)) {

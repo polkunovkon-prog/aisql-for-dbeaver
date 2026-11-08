@@ -87,11 +87,43 @@
             defaultAllowMode="ALWAYS_ALLOW"
             class="com.aisql.dbeaver.core.functions.ListObjectsFunction"
             categoryId="ai.sql"
-            description="Возвращает список объектов базы данных: таблицы, представления, схемы, последовательности, функции, процедуры, триггеры, индексы и другие. Можно фильтровать по типу (type), по имени (nameFilter — подстрока или регулярное выражение, начинающееся с косой черты) и по схеме (schema). Используй, чтобы узнать, какие функции/процедуры уже есть и какие таблицы доступны.">
+            description="Возвращает список объектов базы данных: таблицы, представления, схемы, последовательности, функции, процедуры, триггеры, индексы и другие. Можно фильтровать по типу (type), по имени (nameFilter — подстрока или регулярное выражение, начинающееся с косой черты) и по схеме (schema). В большой базе предпочитай db_searchObjects — он быстрее и компактнее.">
          <parameter name="type" required="false" type="string" description="Фильтр по типу объекта, например TABLE, VIEW, FUNCTION, PROCEDURE, SCHEMA, SEQUENCE, TRIGGER, INDEX. Пусто — все типы."/>
          <parameter name="nameFilter" required="false" type="string" description="Фильтр по имени: подстрока (без учёта регистра) или регулярное выражение, если значение начинается с косой черты."/>
          <parameter name="schema" required="false" type="string" description="Имя схемы/каталога, внутри которого искать. Пусто — вся база."/>
          <parameter name="includeSystem" required="false" type="boolean" description="Включать системные и служебные объекты. По умолчанию: false."/>
+      </function>
+
+      <function
+            id="searchObjects"
+            name="Поиск объектов по имени"
+            enabledByDefault="true"
+            type="INFORMATION"
+            purpose="ALL"
+            system="true"
+            defaultAllowMode="ALWAYS_ALLOW"
+            class="com.aisql.dbeaver.core.functions.SearchObjectsFunction"
+            categoryId="ai.sql"
+            description="Ищет объекты БД (таблицы, представления, функции, процедуры, триггеры и др.) по подстроке имени без учёта регистра или по регулярному выражению, если шаблон начинается с косой черты (пример: /^order_.*_dt$/). Возвращает точные полные имена (схема.объект) и тип — до limit совпадений. ИСПОЛЬЗУЙ ЭТУ ФУНКЦИЮ ПЕРВОЙ, когда нужно найти точное имя таблицы/функции в большой схеме, прежде чем составлять запросы: это дешевле и точнее, чем db_listObjects. Затем структуру смотри через db_getObjectDdl, примеры строк — db_getTableSample.">
+         <parameter name="pattern" required="true" type="string" description="Подстрока имени (без учёта регистра) или регулярное выражение, начинающееся с косой черты."/>
+         <parameter name="type" required="false" type="string" description="Фильтр по типу объекта: TABLE, VIEW, FUNCTION, PROCEDURE, TRIGGER, INDEX... Пусто — все типы."/>
+         <parameter name="limit" required="false" type="integer" description="Максимум совпадений в ответе. По умолчанию: 30. Максимум: 200."/>
+      </function>
+
+      <function
+            id="getTableSample"
+            name="Образец строк таблицы"
+            enabledByDefault="true"
+            type="INFORMATION"
+            purpose="ALL"
+            system="true"
+            defaultAllowMode="ASK"
+            class="com.aisql.dbeaver.core.functions.GetTableSampleFunction"
+            categoryId="ai.sql"
+            description="Возвращает структуру таблицы/представления (колонки и типы) и образец нескольких строк (до rows, по умолчанию 5, максимум 50). ИСПОЛЬЗУЙ, когда нужно понять форматы данных и типичные значения (даты, коды, перечисления), чтобы составить корректные фильтры и JOIN. Выполняется только SELECT * FROM &lt;таблица&gt; с LIMIT диалекта СУБД; действуют маскирование колонок и детекция ПДн — конфиденциальные значения в модель не попадают. Имя уточни заранее через db_searchObjects.">
+         <parameter name="table" required="true" type="string" description="Имя таблицы или представления (можно schema.table)."/>
+         <parameter name="schema" required="false" type="string" description="Имя схемы, если нужно уточнить."/>
+         <parameter name="rows" required="false" type="integer" description="Сколько строк вернуть. По умолчанию: 5. Максимум: 50."/>
       </function>
 
       <function

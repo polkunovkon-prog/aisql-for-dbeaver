@@ -40,6 +40,10 @@ public final class AllTests {
         // Аудит — первым среди пишущих в журнал: он очищает файл и проверяет
         // цепочку с genesis, а кэш последнего хеша пересчитывается по файлу.
         AisqlAuditTest.run();
+        EnterprisePolicyTest.run();
+        PiiDetectorTest.run();
+        SqlErrorHintsTest.run();
+        AiFunctionsTest.run();
         PromptBuilderTest.run();
         AiEditLogicTest.run();
         AiEditDiffTest.run();

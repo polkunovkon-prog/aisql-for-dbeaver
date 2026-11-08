@@ -11,8 +11,11 @@ package com.aisql.dbeaver.ui;
 
 import com.aisql.dbeaver.core.AisqlAudit;
 import com.aisql.dbeaver.core.AisqlCore;
+import com.aisql.dbeaver.core.AuditSyslog;
 import com.aisql.dbeaver.core.ConnectionProfiles;
+import com.aisql.dbeaver.core.EnterprisePolicy;
 import com.aisql.dbeaver.core.MaskingRules;
+import com.aisql.dbeaver.core.PromptInjectionDefense;
 import com.aisql.dbeaver.core.QueryPolicy;
 
 import org.eclipse.jface.dialogs.Dialog;
@@ -45,6 +48,7 @@ import java.awt.Desktop;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 /**
@@ -70,6 +74,15 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
     private static final String[] EDIT_PREVIEW_LABELS = {
         "diff — точечные замены: «было/стало» на местах, можно отметить нужные",
         "full — весь новый фрагмент целиком под выделением"
+    };
+
+    private static final String[] INJECTION_MODE_VALUES = {
+        AisqlCore.INJECTION_MODE_OFF, AisqlCore.INJECTION_MODE_FLAG, AisqlCore.INJECTION_MODE_STRICT
+    };
+    private static final String[] INJECTION_MODE_LABELS = {
+        "off — не проверять",
+        "flag — помечать в аудите (по умолчанию)",
+        "strict — помечать и БЛОКИРОВАТЬ SQL с попыткой угона модели"
     };
 
     private Combo defaultProfileCombo;
@@ -98,6 +111,21 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
     private Text auditMaxBytesText;
     private Text auditMaxFilesText;
 
+    private Button syslogEnabledCheck;
+    private Text syslogHostText;
+    private Text syslogPortText;
+    private Text syslogFacilityText;
+    private Text syslogAppNameText;
+
+    private Combo injectionModeCombo;
+    private Button toolFenceCheck;
+    private Button detectPiiCheck;
+    private Text piiReplacementText;
+    private Text sampleMaxRowsText;
+
+    private Label statusLabel;
+    private Label policyLabel;
+
     private Label settingsPathLabel;
     private Label auditPathLabel;
 
@@ -116,14 +144,18 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
         scroller.setExpandVertical(true);
         composite.setLayout(new GridLayout(1, false));
 
+        createStatusSection(composite);
         createProfilesSection(composite);
         createLimitsSection(composite);
         createMaskingSection(composite);
+        createSecuritySection(composite);
         createEditSection(composite);
         createAuditSection(composite);
         createBottomSection(composite);
 
         loadValues(AisqlCore.loadSettings());
+        applyPolicyLocks();
+        updateStatusLine();
 
         composite.layout();
         scroller.setMinSize(composite.computeSize(SWT.DEFAULT, SWT.DEFAULT));
@@ -133,6 +165,14 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
     // ----------------------------------------------------------------------
     //  Секции страницы
     // ----------------------------------------------------------------------
+
+    private void createStatusSection(Composite parent) {
+        Group group = createGroup(parent, "Статус защиты");
+        statusLabel = new Label(group, SWT.WRAP);
+        statusLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+        policyLabel = new Label(group, SWT.WRAP);
+        policyLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+    }
 
     private void createProfilesSection(Composite parent) {
         Group group = createGroup(parent, "Профили безопасности подключений");
@@ -208,6 +248,8 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
             "0", 8);
         macrosMaxBytesText = createNumberField(group,
             "Максимальный размер макроса, байт (macros.maxBytes):", "1024", 8);
+        sampleMaxRowsText = createNumberField(group,
+            "Строк в образце таблицы по умолчанию (sample.maxRows, максимум 50):", "5", 6);
 
         Label forbiddenLabel = new Label(group, SWT.NONE);
         forbiddenLabel.setText("Запрещённые конструкции (policy.forbidden) — "
@@ -251,6 +293,45 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
             + "таблица — по имени сущности (можно с схемой) или «*». "
             + "Заменённое значение подставляется до чтения данных, "
             + "поэтому реальные значения не попадают в ответ модели.");
+        note.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+
+        detectPiiCheck = new Button(group, SWT.CHECK);
+        detectPiiCheck.setText("Автодетекция ПДн по значению: email, телефон, банковская карта "
+            + "(алгоритм Луна), ИНН и СНИЛС (контрольные суммы) — замена даже если колонка "
+            + "не покрыта правилами (SELECT * и вычислимые колонки)");
+        detectPiiCheck.setLayoutData(
+            new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+
+        Label piiLabel = new Label(group, SWT.NONE);
+        piiLabel.setText("Замена для распознанных ПДн (mask.piiReplacement):");
+        piiReplacementText = new Text(group, SWT.BORDER);
+        GridData piiData = new GridData(SWT.LEFT, SWT.CENTER, false, false);
+        piiData.widthHint = 140;
+        piiReplacementText.setLayoutData(piiData);
+    }
+
+    private void createSecuritySection(Composite parent) {
+        Group group = createGroup(parent, "Защита от промпт-инъекций");
+
+        Label modeLabel = new Label(group, SWT.NONE);
+        modeLabel.setText("Режим (injection.mode):");
+        injectionModeCombo = new Combo(group, SWT.READ_ONLY | SWT.DROP_DOWN);
+        injectionModeCombo.setItems(INJECTION_MODE_LABELS);
+        injectionModeCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+
+        toolFenceCheck = new Button(group, SWT.CHECK);
+        toolFenceCheck.setText("Помечать данные из БД (DDL, образцы строк) как «данные, "
+            + "не инструкции» — защита от непрямых инъекций через содержимое БД "
+            + "(toolOutput.fence)");
+        toolFenceCheck.setLayoutData(
+            new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+
+        Label note = new Label(group, SWT.WRAP);
+        note.setText("Проверяются задание пользователя, SQL от модели и данные из БД. "
+            + "Режим strict блокирует SQL с признаками угона модели («ignore previous "
+            + "instructions», «reveal your prompt» и т.п.); обычные SQL-конструкции "
+            + "(UNION SELECT, DROP TABLE в FULL-профиле) не блокируются — только помечаются. "
+            + "Инструкции из содержимого БД не выполняются в любом режиме.");
         note.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
     }
 
@@ -312,11 +393,30 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
         auditMaxFilesText = createNumberField(group,
             "Хранить файлов журнала, включая текущий (audit.maxFiles):", "1", 4);
 
+        Label syslogTitle = new Label(group, SWT.WRAP);
+        syslogTitle.setText("Дублирование событий в корпоративный SIEM (syslog/UDP, RFC 5424-подобный формат). "
+            + "Рекомендация NIST SP 800-92: внешняя копия журнала защищает от подмены локального файла.");
+        syslogTitle.setLayoutData(
+            new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+
+        syslogEnabledCheck = new Button(group, SWT.CHECK);
+        syslogEnabledCheck.setText("Отправлять события аудита в syslog (audit.syslog.enabled)");
+        syslogEnabledCheck.setLayoutData(
+            new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+
+        syslogHostText = createTextField(group, "Сервер (audit.syslog.host):", "syslog.corp.example", 220);
+        syslogPortText = createNumberField(group, "Порт (audit.syslog.port):", "514", 6);
+        syslogFacilityText = createNumberField(group,
+            "Функция 0–23, local0=16 (audit.syslog.facility):", "16", 6);
+        syslogAppNameText = createTextField(group, "Имя приложения (audit.syslog.appname):", "aisql", 100);
+
         Composite buttons = new Composite(group, SWT.NONE);
         buttons.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
         buttons.setLayout(new RowLayout());
         createButton(buttons, "Открыть журнал аудита", e -> openAuditFile());
         createButton(buttons, "Открыть каталог настроек", e -> openSettingsDir());
+        createButton(buttons, "Проверить целостность журнала", e -> verifyAuditAction());
+        createButton(buttons, "Тест: отправить событие в syslog", e -> testSyslogAction());
 
         auditPathLabel = new Label(group, SWT.WRAP);
         auditPathLabel.setLayoutData(
@@ -405,6 +505,33 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
             AisqlAudit.KEY_MAX_BYTES, String.valueOf(AisqlAudit.DEFAULT_MAX_BYTES)));
         auditMaxFilesText.setText(p.getProperty(
             AisqlAudit.KEY_MAX_FILES, String.valueOf(AisqlAudit.DEFAULT_MAX_FILES)));
+
+        syslogEnabledCheck.setSelection(
+            Boolean.parseBoolean(p.getProperty(AuditSyslog.KEY_ENABLED, "false")));
+        syslogHostText.setText(p.getProperty(AuditSyslog.KEY_HOST, ""));
+        syslogPortText.setText(p.getProperty(
+            AuditSyslog.KEY_PORT, String.valueOf(AuditSyslog.DEFAULT_PORT)));
+        syslogFacilityText.setText(p.getProperty(
+            AuditSyslog.KEY_FACILITY, String.valueOf(AuditSyslog.DEFAULT_FACILITY)));
+        syslogAppNameText.setText(p.getProperty(AuditSyslog.KEY_APPNAME, AuditSyslog.DEFAULT_APPNAME));
+
+        String mode = PromptInjectionDefense.mode();
+        int modeIndex = 1;
+        for (int i = 0; i < INJECTION_MODE_VALUES.length; i++) {
+            if (INJECTION_MODE_VALUES[i].equalsIgnoreCase(mode)) {
+                modeIndex = i;
+            }
+        }
+        injectionModeCombo.select(modeIndex);
+        toolFenceCheck.setSelection(
+            Boolean.parseBoolean(p.getProperty(AisqlCore.KEY_TOOL_OUTPUT_FENCE, "true")));
+
+        detectPiiCheck.setSelection(
+            Boolean.parseBoolean(p.getProperty(AisqlCore.KEY_DETECT_PII, "true")));
+        piiReplacementText.setText(p.getProperty(
+            AisqlCore.KEY_PII_REPLACEMENT, AisqlCore.DEFAULT_PII_REPLACEMENT));
+        sampleMaxRowsText.setText(p.getProperty(
+            AisqlCore.KEY_SAMPLE_MAX_ROWS, String.valueOf(AisqlCore.DEFAULT_SAMPLE_ROWS)));
 
         updatePathLabels();
     }
@@ -501,7 +628,26 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
     @Override
     public boolean performOk() {
         try {
-            Properties p = AisqlCore.loadSettings();
+            saveSettingsFromFields();
+            updatePathLabels();
+            updateStatusLine();
+            return super.performOk();
+        } catch (Exception e) {
+            MessageDialog.openError(getShell(), "AI SQL",
+                "Не удалось сохранить настройки:\n" + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Сохраняет значения полей в пользовательский файл настроек.
+     * Ключи, зафиксированные корпоративной политикой, не записываются
+     * (их значения всё равно берутся из политики).
+     */
+    private void saveSettingsFromFields() throws Exception {
+        // Отправной файл — пользовательские настройки (без значений
+        // корпоративной политики), чтобы политика не «прилипала» к файлу.
+        Properties p = AisqlCore.userSettings();
 
             int profileIndex = defaultProfileCombo.getSelectionIndex();
             p.setProperty(ConnectionProfiles.KEY_DEFAULT,
@@ -568,14 +714,44 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
             p.setProperty(AisqlAudit.KEY_MAX_FILES,
                 String.valueOf(parseNumber(auditMaxFilesText, "audit.maxFiles", 1, 100)));
 
+            p.setProperty(AisqlCore.KEY_INJECTION_MODE,
+                injectionModeCombo.getSelectionIndex() >= 0
+                    ? INJECTION_MODE_VALUES[injectionModeCombo.getSelectionIndex()]
+                    : AisqlCore.INJECTION_MODE_FLAG);
+            p.setProperty(AisqlCore.KEY_TOOL_OUTPUT_FENCE,
+                String.valueOf(toolFenceCheck.getSelection()));
+            p.setProperty(AisqlCore.KEY_DETECT_PII,
+                String.valueOf(detectPiiCheck.getSelection()));
+            String piiReplacement = piiReplacementText.getText().trim();
+            p.setProperty(AisqlCore.KEY_PII_REPLACEMENT,
+                piiReplacement.isEmpty() ? AisqlCore.DEFAULT_PII_REPLACEMENT : piiReplacement);
+            p.setProperty(AisqlCore.KEY_SAMPLE_MAX_ROWS,
+                String.valueOf(parseNumber(sampleMaxRowsText, "sample.maxRows",
+                    1, AisqlCore.HARD_MAX_SAMPLE_ROWS)));
+
+            p.setProperty(AuditSyslog.KEY_ENABLED,
+                String.valueOf(syslogEnabledCheck.getSelection()));
+            String syslogHost = syslogHostText.getText().trim();
+            if (syslogHost.isEmpty()) {
+                p.remove(AuditSyslog.KEY_HOST);
+            } else {
+                p.setProperty(AuditSyslog.KEY_HOST, syslogHost);
+            }
+            p.setProperty(AuditSyslog.KEY_PORT,
+                String.valueOf(parseNumber(syslogPortText, "audit.syslog.port", 1, 65535)));
+            p.setProperty(AuditSyslog.KEY_FACILITY,
+                String.valueOf(parseNumber(syslogFacilityText, "audit.syslog.facility", 0, 23)));
+            String appname = syslogAppNameText.getText().trim();
+            p.setProperty(AuditSyslog.KEY_APPNAME,
+                appname.isEmpty() ? AuditSyslog.DEFAULT_APPNAME : appname);
+
+            // Ключи, зафиксированные корпоративной политикой, в пользовательский
+            // файл не пишем — их всё равно перекрывает политика.
+            for (String locked : EnterprisePolicy.lockedKeys()) {
+                p.remove(locked);
+            }
+
             AisqlCore.saveSettings(p);
-            updatePathLabels();
-            return super.performOk();
-        } catch (Exception e) {
-            MessageDialog.openError(getShell(), "AI SQL",
-                "Не удалось сохранить настройки:\n" + e.getMessage());
-            return false;
-        }
     }
 
     @Override
@@ -649,6 +825,152 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
     }
 
     // ----------------------------------------------------------------------
+    //  Статус защиты, корпоративная политика, проверки
+    // ----------------------------------------------------------------------
+
+    /** Краткая сводка действующих защит — мгновенная видимость состояния. */
+    private void updateStatusLine() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Инъекции: ").append(PromptInjectionDefense.mode());
+        sb.append("  ·  ПДн-детекция: ")
+            .append(AisqlCore.getBool(AisqlCore.KEY_DETECT_PII, true) ? "вкл" : "выкл");
+        sb.append("  ·  Маскирование: ")
+            .append(AisqlCore.getBool(MaskingRules.KEY_ENABLED, true)
+                ? "вкл, правил: " + MaskingRules.loadRules().size() : "выкл");
+        sb.append("  ·  Аудит: ")
+            .append(AisqlCore.getBool(AisqlCore.KEY_AUDIT_ENABLED, true) ? "вкл" : "выкл");
+        sb.append(AuditSyslog.enabled() ? " + syslog" : "");
+        statusLabel.setText(sb.toString());
+
+        if (EnterprisePolicy.isBroken()) {
+            policyLabel.setText("КОРПОРАТИВНАЯ ПОЛИТИКА: задана, но не читается — "
+                + "инструменты заблокированы (fail-closed). Обратитесь к администратору.");
+        } else if (EnterprisePolicy.isActive()) {
+            List<String> locked = EnterprisePolicy.lockedKeys();
+            policyLabel.setText("КОРПОРАТИВНАЯ ПОЛИТИКА АКТИВНА — настройки, "
+                + "зафиксированные администратором, нельзя изменить здесь. Ключи: "
+                + String.join(", ", locked));
+        } else {
+            policyLabel.setText("Корпоративная политика не задана "
+                + "(ai-sql-enterprise.properties или -Daisql.enterprise.policy).");
+        }
+        statusLabel.getParent().layout();
+    }
+
+    /** Поля, зафиксированные политикой, делаются нередактируемыми. */
+    private void applyPolicyLocks() {
+        lockIfManaged(defaultProfileCombo, ConnectionProfiles.KEY_DEFAULT);
+        lockIfManaged(connectionProfilesTable, ConnectionProfiles.KEY_PREFIX);
+        lockIfManaged(runQueryStrictCheck, AisqlCore.KEY_RUNQUERY_STRICT);
+        lockIfManaged(disableAutocommitCheck, AisqlCore.KEY_WRITE_DISABLE_AUTOCOMMIT);
+        lockIfManaged(maxRowsText, AisqlCore.KEY_LIMIT_MAX_ROWS);
+        lockIfManaged(timeoutText, AisqlCore.KEY_LIMIT_TIMEOUT);
+        lockIfManaged(maxPayloadText, AisqlCore.KEY_LIMIT_MAX_PAYLOAD);
+        lockIfManaged(sampleMaxRowsText, AisqlCore.KEY_SAMPLE_MAX_ROWS);
+        lockIfManaged(forbiddenText, QueryPolicy.KEY_FORBIDDEN);
+        lockIfManaged(maskEnabledCheck, MaskingRules.KEY_ENABLED);
+        lockIfManaged(maskRulesText, MaskingRules.KEY_RULES);
+        lockIfManaged(detectPiiCheck, AisqlCore.KEY_DETECT_PII);
+        lockIfManaged(piiReplacementText, AisqlCore.KEY_PII_REPLACEMENT);
+        lockIfManaged(injectionModeCombo, AisqlCore.KEY_INJECTION_MODE);
+        lockIfManaged(toolFenceCheck, AisqlCore.KEY_TOOL_OUTPUT_FENCE);
+        lockIfManaged(auditEnabledCheck, AisqlCore.KEY_AUDIT_ENABLED);
+        lockIfManaged(auditRedactCheck, AisqlAudit.KEY_REDACT_LITERALS);
+        lockIfManaged(syslogEnabledCheck, AuditSyslog.KEY_ENABLED);
+        lockIfManaged(syslogHostText, AuditSyslog.KEY_HOST);
+        lockIfManaged(syslogPortText, AuditSyslog.KEY_PORT);
+        lockIfManaged(editEnabledCheck, AisqlCore.KEY_EDIT_ENABLED);
+    }
+
+    private void lockIfManaged(Control control, String key) {
+        if (control != null && (EnterprisePolicy.isLocked(key)
+            || (key.endsWith(".") && isAnyLockedWithPrefix(key)))) {
+            control.setEnabled(false);
+        }
+    }
+
+    private boolean isAnyLockedWithPrefix(String prefix) {
+        for (String k : EnterprisePolicy.lockedKeys()) {
+            if (k.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Проверка цепочки хешей текущего и ротированных файлов журнала. */
+    private void verifyAuditAction() {
+        try {
+            Path file = AisqlCore.auditFile();
+            if (!Files.exists(file)) {
+                MessageDialog.openInformation(getShell(), "Проверка журнала аудита",
+                    "Журнал ещё не создан (событий не было).");
+                return;
+            }
+            int files = 0;
+            int ok = 0;
+            List<String> problems = new ArrayList<>();
+            int maxFiles = AisqlCore.getInt(AisqlAudit.KEY_MAX_FILES, AisqlAudit.DEFAULT_MAX_FILES);
+            for (int i = 0; i < Math.max(1, maxFiles); i++) {
+                Path f = i == 0 ? file : file.resolveSibling(
+                    AisqlAudit.FILE_NAME + "." + i);
+                if (!Files.exists(f)) {
+                    continue;
+                }
+                files++;
+                if (AisqlAudit.verify(f)) {
+                    ok++;
+                } else {
+                    problems.add(f.getFileName().toString());
+                }
+            }
+            if (problems.isEmpty()) {
+                MessageDialog.openInformation(getShell(), "Проверка журнала аудита",
+                    "Целостность подтверждена: " + ok + " из " + files
+                        + " файлов, цепочка хешей не нарушена.");
+            } else {
+                MessageDialog.openError(getShell(), "Проверка журнала аудита",
+                    "НАРУШЕНИЕ целостности в файл(ах): " + String.join(", ", problems)
+                        + ". Возможно, журнал правился или повреждён. "
+                        + "Сравните с копией в SIEM (audit.syslog.*).");
+            }
+        } catch (Exception e) {
+            MessageDialog.openError(getShell(), "Проверка журнала аудита",
+                "Не удалось проверить журнал: " + e.getMessage());
+        }
+    }
+
+    /** Тестовая отправка события в syslog (по текущим настройкам полей). */
+    private void testSyslogAction() {
+        try {
+            // Сохраняем текущие значения полей, чтобы тест шёл по ним
+            // (без закрытия диалога настроек).
+            saveSettingsFromFields();
+            String host = AisqlCore.getSetting(AuditSyslog.KEY_HOST, "");
+            if (host.isBlank() || !AisqlCore.getBool(AuditSyslog.KEY_ENABLED, false)) {
+                MessageDialog.openInformation(getShell(), "Тест syslog",
+                    "Заполните сервер, включите отправку и примените (Apply) перед тестом.");
+                return;
+            }
+            AisqlAudit.Event e = new AisqlAudit.Event();
+            e.function = "syslog_test";
+            e.decision = "read";
+            e.outcome = "OK";
+            e.detail = "тестовая отправка со страницы настроек";
+            AisqlAudit.write(e);
+            MessageDialog.openInformation(getShell(), "Тест syslog",
+                "Тестовое событие отправлено на " + host + ":"
+                    + AisqlCore.getInt(AuditSyslog.KEY_PORT, AuditSyslog.DEFAULT_PORT)
+                    + ". Проверьте приём в SIEM/rsyslog (приложение "
+                    + AisqlCore.getSetting(AuditSyslog.KEY_APPNAME, AuditSyslog.DEFAULT_APPNAME)
+                    + "). Отправка UDP — без подтверждения доставки.");
+        } catch (Exception e) {
+            MessageDialog.openError(getShell(), "Тест syslog",
+                "Не удалось отправить тестовое событие: " + e.getMessage());
+        }
+    }
+
+    // ----------------------------------------------------------------------
     //  Вспомогательные
     // ----------------------------------------------------------------------
 
@@ -669,6 +991,18 @@ public class AisqlPreferencePage extends PreferencePage implements IWorkbenchPre
         data.widthHint = 90;
         text.setLayoutData(data);
         text.setText(widthHint);
+        return text;
+    }
+
+    private static Text createTextField(Composite parent, String labelText,
+                                        String placeholder, int width) {
+        Label label = new Label(parent, SWT.NONE);
+        label.setText(labelText);
+        Text text = new Text(parent, SWT.BORDER);
+        GridData data = new GridData(SWT.LEFT, SWT.CENTER, false, false);
+        data.widthHint = width;
+        text.setLayoutData(data);
+        text.setText(placeholder);
         return text;
     }
 
